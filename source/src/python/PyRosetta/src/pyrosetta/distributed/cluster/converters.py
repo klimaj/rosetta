@@ -391,6 +391,11 @@ def _get_compressed_packed_pose_kwargs_pairs_list(
     decoy_id = _get_decoy_id(output_kwargs[protocols_key], decoy_ids)
     compressed_packed_pose_kwargs_pairs_list = []
     for i, packed_pose in enumerate(packed_poses):
+        # if filter_results and packed_pose.empty():
+        #     logging.info(
+        #         "Discarding an empty `PackedPose` object in the queue decoy because 'filter_results' is enabled."
+        #     )
+        #     continue
         if (decoy_id != None) and (i != decoy_id):
             logging.info(
                 "Discarding a returned decoy because it does not match the user-provided 'decoy_ids'."

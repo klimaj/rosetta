@@ -540,6 +540,12 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
         validator=[_validate_float, attr.validators.instance_of((float, int))],
         converter=attr.converters.default_if_none(default=3.0),
     )
+    filter_results = attr.ib(
+        type=bool,
+        default=False,
+        validator=attr.validators.instance_of(bool),
+        converter=attr.converters.default_if_none(default=False),
+    )
     save_all = attr.ib(
         type=bool,
         default=False,
