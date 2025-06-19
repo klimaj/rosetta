@@ -262,6 +262,50 @@ def _none_to_packed(obj: None, protocol_name: str) -> PackedPose:
     return io.to_packed(Pose())
 
 
+# @singledispatch
+# def to_packed(obj: Any, filter_results: bool, protocol_name: str) -> NoReturn:
+#     """Parse a single result from the user-provided PyRosetta protocol."""
+#     logging.error(
+#         f"{protocol_name} did not return objects of type `NoneType`, `Pose`, `PackedPose`, or `dict`!"
+#     )
+#     raise OutputError(obj)
+
+
+# @to_packed.register(Pose)
+# def _to_packed(obj: Pose, filter_results: bool, protocol_name: str) -> PackedPose:
+#     return None if filter_results and obj.empty() else io.to_packed(obj)
+
+
+# @to_packed.register(PackedPose)
+# def _is_packed(
+#     obj: PackedPose, filter_results: bool, protocol_name: str
+# ) -> PackedPose:
+#     return None if filter_results and obj.empty() else obj
+
+
+# @to_packed.register(dict)
+# def _is_kwargs(
+#     obj: Dict[Any, Any], filter_results: bool, protocol_name: str
+# ) -> Dict[Any, Any]:
+#     return obj
+
+
+# @to_packed.register(type(None))
+# def _none_to_packed(obj: None, filter_results: bool, protocol_name: str) -> PackedPose:
+#     if filter_results:
+#         logging.debug(
+#             f"Protocol '{protocol_name}' returned `None` and 'filter_results' is enabled. "
+#             + "Not putting an empty `PackedPose` object into the queue."
+#         )
+#         return None
+#     else:
+#         logging.warning(
+#             f"Protocol '{protocol_name}' returned `None` and 'filter_results' is disabled. "
+#             + "Putting an empty `PackedPose` object into the queue."
+#         )
+#         return io.to_packed(Pose())
+
+
 @singledispatch
 def to_str(obj: Any, attribute: str) -> Union[str, NoReturn]:
     try:
@@ -443,3 +487,7 @@ def is_packed(obj: Any) -> bool:
 
 def is_dict(obj: Any) -> bool:
     return isinstance(obj, dict)
+
+
+def is_none(obj: Any) -> bool:
+    return isinstance(obj, type(None))

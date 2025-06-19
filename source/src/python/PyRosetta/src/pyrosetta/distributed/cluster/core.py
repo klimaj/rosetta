@@ -247,6 +247,8 @@ import os
 from datetime import datetime
 from pyrosetta.distributed.cluster.base import TaskBase, _get_residue_type_set
 from pyrosetta.distributed.cluster.converters import (
+    EmptyProtocol,
+    EmptyQueue,
     _parse_decoy_ids,
     _parse_environment,
     _parse_input_packed_pose,
@@ -542,9 +544,9 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
     )
     filter_results = attr.ib(
         type=bool,
-        default=False,
+        default=True,
         validator=attr.validators.instance_of(bool),
-        converter=attr.converters.default_if_none(default=False),
+        converter=attr.converters.default_if_none(default=True),
     )
     save_all = attr.ib(
         type=bool,
@@ -710,6 +712,7 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
             self.DATETIME_FORMAT,
             self.compression,
             self.max_delay_time,
+            self.filter_results,
             client_residue_type_set,
         )
         seq = as_completed(
@@ -740,6 +743,10 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
                 "Percent Complete = {0:0.5f} %".format((i / self.tasks_size) * 100.0)
             )
             for compressed_packed_pose, compressed_kwargs in results:
+                if isinstance(compressed_packed_pose, EmptyProtocol):
+                    continue
+                elif isinstance(compressed_packed_pose, EmptyQueue):
+                    compressed_packed_pose = compressed_packed_pose.result
                 kwargs = self.serializer.decompress_kwargs(compressed_kwargs)
                 if not kwargs[self.protocols_key]:
                     self._save_results(compressed_packed_pose, kwargs)

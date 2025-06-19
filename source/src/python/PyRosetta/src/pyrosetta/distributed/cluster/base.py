@@ -198,6 +198,7 @@ def capture_task_metadata(func: M) -> M:
         ignore_errors,
         protocols_key,
         decoy_ids,
+        filter_results,
         serializer,
         **kwargs,
     ):
@@ -228,6 +229,7 @@ def capture_task_metadata(func: M) -> M:
             ignore_errors,
             protocols_key,
             decoy_ids,
+            filter_results,
             serializer,
             **kwargs,
         )

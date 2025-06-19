@@ -35,6 +35,7 @@ from pyrosetta.distributed.cluster.converter_tasks import (
     get_yml,
     is_bytes,
     is_dict,
+    is_none,
     is_packed,
     parse_input_packed_pose as _parse_input_packed_pose,
     to_int,
@@ -61,6 +62,22 @@ from typing import (
 S = TypeVar("S", bound=Serialization)
 
 
+class EmptyProtocol:
+    @property
+    def result(self):
+        return None
+
+
+class EmptyQueue:
+    def __init__(self, protocol_name: str, ignore_errors: bool):
+        self.protocol_name = protocol_name
+        self.ignore_errors = ignore_errors
+
+    @property
+    def result(self):
+        return None
+
+
 def _parse_decoy_ids(objs: Any) -> List[int]:
     """
     Normalize user-provided PyRosetta 'decoy_ids' to a `list` object containing `int` objects.
@@ -75,7 +92,7 @@ def _parse_empty_queue(protocol_name: str, ignore_errors: bool) -> None:
         f"User-provided PyRosetta protocol '{protocol_name}' resulted in an empty queue with `ignore_errors={ignore_errors}`!"
         + "Putting a `None` object into the queue."
     )
-    return None
+    return EmptyQueue(protocol_name, ignore_errors)
 
 
 def _parse_environment(obj: Any) -> str:
@@ -352,18 +369,22 @@ def _get_decoy_id(protocols: Sized, decoy_ids: List[int]) -> Optional[int]:
 def _get_packed_poses_output_kwargs(
     result: Any,
     input_kwargs: Dict[Any, Any],
+    filter_results: bool,
     protocol_name: str,
-) -> Tuple[List[PackedPose], Dict[Any, Any]]:
+) -> Tuple[List[Optional[PackedPose]], Dict[Any, Any]]:
     packed_poses = []
     protocol_kwargs = []
     for obj in to_iterable(result, to_packed, protocol_name):
         if is_packed(obj):
-            packed_poses.append(obj)
+            if filter_results and obj.empty():
+                pass
+            else:
+                packed_poses.append(obj)
         elif is_dict(obj):
             protocol_kwargs.append(obj)
 
     if len(packed_poses) == 0:
-        packed_poses = to_iterable(None, to_packed, protocol_name)
+        packed_poses.append(None)
 
     if len(protocol_kwargs) == 0:
         output_kwargs = input_kwargs
@@ -381,21 +402,16 @@ def _get_packed_poses_output_kwargs(
 
 
 def _get_compressed_packed_pose_kwargs_pairs_list(
-    packed_poses: List[PackedPose],
+    packed_poses: List[Optional[PackedPose]],
     output_kwargs: Dict[Any, Any],
     protocol_name: str,
     protocols_key: str,
     decoy_ids: List[int],
     serializer: S,
-) -> List[Tuple[bytes, bytes]]:
+) -> List[Tuple[Optional[bytes], bytes]]:
     decoy_id = _get_decoy_id(output_kwargs[protocols_key], decoy_ids)
     compressed_packed_pose_kwargs_pairs_list = []
     for i, packed_pose in enumerate(packed_poses):
-        # if filter_results and packed_pose.empty():
-        #     logging.info(
-        #         "Discarding an empty `PackedPose` object in the queue decoy because 'filter_results' is enabled."
-        #     )
-        #     continue
         if (decoy_id != None) and (i != decoy_id):
             logging.info(
                 "Discarding a returned decoy because it does not match the user-provided 'decoy_ids'."
@@ -423,13 +439,18 @@ def _parse_protocol_results(
     protocol_name: str,
     protocols_key: str,
     decoy_ids: List[int],
+    filter_results: bool,
     serializer: S,
 ) -> List[Tuple[bytes, bytes]]:
     """Parse results from the user-provided PyRosetta protocol."""
-    packed_poses, output_kwargs = _get_packed_poses_output_kwargs(result, input_kwargs, protocol_name)
+    packed_poses, output_kwargs = _get_packed_poses_output_kwargs(result, input_kwargs, filter_results, protocol_name)
     compressed_packed_pose_kwargs_pairs_list = _get_compressed_packed_pose_kwargs_pairs_list(
         packed_poses, output_kwargs, protocol_name, protocols_key, decoy_ids, serializer
     )
+    if len(compressed_packed_pose_kwargs_pairs_list) == 1:
+        obj, compressed_task_kwargs = next(iter(compressed_packed_pose_kwargs_pairs_list))
+        if is_none(obj):
+            compressed_packed_pose_kwargs_pairs_list = [(EmptyProtocol(), compressed_task_kwargs)]
 
     return compressed_packed_pose_kwargs_pairs_list
 

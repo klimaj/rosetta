@@ -92,13 +92,22 @@ def run_protocol(
     ignore_errors: bool,
     protocols_key: str,
     decoy_ids: List[int],
+    filter_results: bool,
     serializer: S,
     **kwargs: Dict[Any, Any],
-) -> List[Tuple[bytes, bytes]]:
+) -> List[Tuple[Optional[bytes], bytes]]:
     """Parse the user-provided PyRosetta protocol results."""
 
     result = user_protocol(packed_pose, protocol, ignore_errors, **kwargs)
-    results = _parse_protocol_results(result, kwargs, protocol.__name__, protocols_key, decoy_ids, serializer)
+    results = _parse_protocol_results(
+        result,
+        kwargs,
+        protocol.__name__,
+        protocols_key,
+        decoy_ids,
+        filter_results,
+        serializer,
+    )
 
     return results
 
@@ -138,6 +147,7 @@ def target(
     protocols_key: str,
     decoy_ids: List[int],
     compression: Optional[Union[str, bool]],
+    filter_results: bool,
     client_residue_type_set: AbstractSet[str],
     client_repr: str,
     **pyrosetta_init_kwargs: Dict[str, Any],
@@ -148,7 +158,15 @@ def target(
     kwargs = serializer.decompress_kwargs(compressed_kwargs)
     kwargs["PyRosettaCluster_client_repr"] = client_repr
     results = run_protocol(
-        protocol, packed_pose, DATETIME_FORMAT, ignore_errors, protocols_key, decoy_ids, serializer, **kwargs
+        protocol,
+        packed_pose,
+        DATETIME_FORMAT,
+        ignore_errors,
+        protocols_key,
+        decoy_ids,
+        filter_results,
+        serializer,
+        **kwargs,
     )
     _validate_residue_type_sets(
         _get_residue_type_set(), client_residue_type_set,
@@ -170,6 +188,7 @@ def user_spawn_thread(
     DATETIME_FORMAT: str,
     compression: Optional[Union[str, bool]],
     max_delay_time: Union[float, int],
+    filter_results: bool,
     client_residue_type_set: AbstractSet[str],
 ) -> List[Tuple[Optional[Union[PackedPose, bytes]], Union[Dict[Any, Any], bytes]]]:
     """Generic worker task using the billiard multiprocessing module."""
@@ -191,6 +210,7 @@ def user_spawn_thread(
             protocols_key,
             decoy_ids,
             compression,
+            filter_results,
             client_residue_type_set,
             client_repr,
         ),
