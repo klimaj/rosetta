@@ -10,6 +10,7 @@ from __future__ import absolute_import
 ###############################################################################
 # PyRosetta initialization files
 
+
 __author__ = "Jason C. Klima"
 
 
@@ -25,12 +26,12 @@ from pyrosetta.rosetta.core.simple_metrics import get_sm_data
 from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
 
 
-class PyRosettaInitFileParser(object):
+class PyRosettaInitFileParserBase(object):
     _prefix_string = "[PyRosettaInitStringFile]"
     _prefix_binary = "[PyRosettaInitBinaryFile]"
 
     def __init__(self):
-        self.pose = pyrosetta.Pose()
+        self.file_counter = -1
 
     def get_protocol_settings_metric(self):
         return XmlObjects().create_from_string(
@@ -47,12 +48,14 @@ class PyRosettaInitFileParser(object):
         """.format(__class__.__name__)
         ).get_simple_metric("protocol_settings")
     
-    def apply_protocol_settings_metric(self):
+    def apply_protocol_settings_metric(self, pose):
         xml_obj = self.get_protocol_settings_metric()
-        xml_obj.apply(self.pose)
+        xml_obj.apply(pose)
 
-    def get_simple_metric_data(self):
-        sm_data = get_sm_data(self.pose)
+        return pose
+
+    def get_protocol_settings_data(self, pose):
+        sm_data = get_sm_data(pose)
         data = dict(sm_data.get_composite_string_metric_data())
         return dict(data["{0}_opt".format(__class__.__name__)])
 
@@ -81,28 +84,38 @@ class PyRosettaInitFileParser(object):
                     if self.is_text_file(line):
                         with open(line, "r") as f2:
                             result[os.path.basename(line)] = "{0}{1}".format(
-                                PyRosettaInitFileParser._prefix_string,
+                                PyRosettaInitFileParserBase._prefix_string,
                                 base64.b64encode(pickle.dumps(f2.read())).decode(),
                             )
                     else:
                         with open(line, "rb") as f2:
                             result[os.path.basename(line)] = "{0}{1}".format(
-                                PyRosettaInitFileParser._prefix_binary,
+                                PyRosettaInitFileParserBase._prefix_binary,
                                 base64.b64encode(f2.read()),
                             )
         elif self.is_text_file(filename):
             with open(filename, "r") as f:
                 result = "{0}{1}".format(
-                    PyRosettaInitFileParser._prefix_string,
+                    PyRosettaInitFileParserBase._prefix_string,
                     base64.b64encode(pickle.dumps(f.read())).decode(),
                 )
         else:
             with open(filename, "rb") as f:
                 result = "{0}{1}".format(
-                    PyRosettaInitFileParser._prefix_binary,
+                    PyRosettaInitFileParserBase._prefix_binary,
                     base64.b64encode(f.read()),
                 )
         results[os.path.basename(filename)] = result
+
+        return results
+
+    def setup_new_file(self, output_dir, option_name, filename):
+        self.file_counter += 1 
+        file = os.path.join(output_dir, option_name.replace(":", "_"), str(self.file_counter), filename)
+        os.makedirs(os.path.dirname(file), exist_ok=False)
+        return file
+
+class PyRosettaInitFileParser(PyRosettaInitFileParserBase):
 
     def init_from_file(self, init_file, output_dir=None):
         if not pyrosetta.rosetta.basic.was_init_called():
@@ -111,35 +124,54 @@ class PyRosettaInitFileParser(object):
 
             if output_dir is None:
                 output_dir = os.path.join(os.getcwd(), "pyrosetta_init_files")
-            os.makedirs(output_dir, exist_ok=False)
 
-            # options = ""
-            # for option_name, values in encoded_flags_dict.items():
-            #     values_formatted = ""
-            #     for value in values:
-            #         if isinstance(value, str):
-            #             if value.startswith(PyRosettaInitFileParser._prefix_string):
-            #                 value = value.split(PyRosettaInitFileParser._prefix_string)[1]
-            #                 file_content = pickle.loads(base64.b64decode(value, validate=True))
-            #                 file = os.path.join()
-            #                 with open(file, "w") as f:
-            #                     f.write(file_content)
-
-            #                 with open()
-            #                 values_formatted += 
-            #             elif value.startswith(PyRosettaInitFileParser._prefix_binary):
-            #             else:
-
-        else:
+            flags_dict = collections.defaultdict(list)
+            for option_name, values in encoded_flags_dict.items():
+                for value in values:
+                    assert isinstance(value, dict)
+                    for filename, data in value.items():
+                        if isinstance(data, str):
+                            if value.startswith(PyRosettaInitFileParserBase._prefix_string):
+                                file_content = pickle.loads(base64.b64decode(value.split(PyRosettaInitFileParserBase._prefix_string)[1], validate=True))
+                                new_file = self.setup_new_file(output_dir, option_name, filename)
+                                with open(new_file, "w") as f:
+                                    f.write(file_content)
+                                flags_dict[option_name].append(new_file)
+                            elif value.startswith(PyRosettaInitFileParser._prefix_binary):
+                                file_content = base64.b64decode(value.split(PyRosettaInitFileParserBase._prefix_binary)[1], validate=True)
+                                new_file = self.setup_new_file(output_dir, option_name, filename)
+                                with open(new_file, "wb") as f:
+                                    f.write(file_content)
+                                flags_dict[option_name].append(new_file)
+                            else:
+                                flags_dict[option_name].append(data)
+                        elif isinstance(data, dict):
+                            for subfilename, subdata in data.items():
+                                assert isinstance(subdata, str)
+                                if subdata.startswith(PyRosettaInitFileParserBase._prefix_string):
+                                    file_content = pickle.loads(base64.b64decode(subdata.split(PyRosettaInitFileParserBase._prefix_string)[1], validate=True))
+                                    new_file = self.setup_new_file(output_dir, option_name, subfilename)
+                                    with open(new_file, "w") as f:
+                                        f.write(file_content)
+                                    flags_dict[option_name].append(new_file)
+                                elif value.startswith(PyRosettaInitFileParser._prefix_binary):
+                                    file_content = base64.b64decode(value.split(PyRosettaInitFileParserBase._prefix_binary)[1], validate=True)
+                                    new_file = self.setup_new_file(output_dir, option_name, filename)
+                                    with open(new_file, "wb") as f:
+                                        f.write(file_content)
+                                    flags_dict[option_name].append(new_file)
+    else:
             raise RuntimeError(
-                "PyRosetta must not be already initialized to initialize from a file."
+                "PyRosetta must not be already initialized to initialize from a file. "
+                "Please ensure that `pyrosetta.init()` was not already called and try again."
             )
 
 
     def dump_init_file(self, output_filename):
         if pyrosetta.rosetta.basic.was_init_called():
-            self.apply_protocol_settings_metric()
-            flags_dict = self.get_simple_metric_data()
+            pose = pyrosetta.Pose()
+            pose = self.apply_protocol_settings_metric(pose)
+            flags_dict = self.get_protocol_settings_data(pose)
             encoded_flags_dict = collections.defaultdict(list)
             for option_name, values in flags_dict.items():
                 for value in values.split():
@@ -151,5 +183,6 @@ class PyRosettaInitFileParser(object):
                 json.dump(encoded_flags_dict, f, indent=4)
         else:
             raise RuntimeError(
-                "PyRosetta must be already initialized to dump an initialization file."
+                "PyRosetta must be already initialized to dump an initialization file. "
+                + "Please run `pyrosetta.init()` with custom flags and try again."
             )
