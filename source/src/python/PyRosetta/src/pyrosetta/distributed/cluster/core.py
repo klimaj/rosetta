@@ -295,7 +295,6 @@ from pyrosetta.distributed.cluster.validators import (
 )
 from pyrosetta.distributed.packed_pose.core import PackedPose
 from typing import (
-    AbstractSet,
     Any,
     List,
     NoReturn,
@@ -630,6 +629,24 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
         validator=attr.validators.instance_of(str),
         converter=_parse_environment,
     )
+    author = attr.ib(
+        type=str,
+        default=None,
+        validator=attr.validators.instance_of(str),
+        converter=attr.converters.default_if_none(""),
+    )
+    email = attr.ib(
+        type=str,
+        default=None,
+        validator=attr.validators.instance_of(str),
+        converter=attr.converters.default_if_none(""),
+    )
+    license = attr.ib(
+        type=str,
+        default=None,
+        validator=attr.validators.instance_of(str),
+        converter=attr.converters.default_if_none(""),
+    )
     environment_file = attr.ib(
         type=str,
         default=attr.Factory(
@@ -640,6 +657,24 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
                         self.project_name.replace(" ", "-"),
                         self.simulation_name.replace(" ", "-"),
                         "environment.yml",
+                    ]
+                ),
+            ),
+            takes_self=True,
+        ),
+        init=False,
+        validator=attr.validators.instance_of(str),
+    )
+    init_file = attr.ib(
+        type=str,
+        default=attr.Factory(
+            lambda self: os.path.join(
+                self.output_path,
+                "_".join(
+                    [
+                        self.project_name.replace(" ", "-"),
+                        self.simulation_name.replace(" ", "-"),
+                        "pyrosetta.init",
                     ]
                 ),
             ),
@@ -662,6 +697,7 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
         _maybe_init_client()
         self._setup_logger()
         self._write_environment_file(self.environment_file)
+        self._write_init_file(self.init_file)
         self.serializer = Serialization(compression=self.compression)
         self.clients_dict = self._setup_clients_dict()
 
