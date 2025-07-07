@@ -27,9 +27,12 @@ def main(tmp_dir):
         raise RuntimeError("PyRosetta is already initialized.")
 
     list_file = os.path.join(tmp_dir, "my_file.list")
+    n_pdb_files = 10
     with open(list_file, "w") as f:
-        for i in range(10):
+        for i in range(n_pdb_files):
             pdb_file = os.path.join(tmp_dir, "tmp_{0}.pdb".format(i))
+            if i >= n_pdb_files // 2:
+                pdb_file += ".gz"
             f.write(pdb_file + os.linesep)
             pose = pyrosetta.pose_from_sequence("A" * i)
             pyrosetta.dump_pdb(pose, pdb_file)

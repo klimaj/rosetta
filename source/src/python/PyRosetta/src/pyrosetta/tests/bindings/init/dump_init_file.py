@@ -18,7 +18,7 @@ import pyrosetta
 
 def main(tmp_dir):
     if not pyrosetta.rosetta.basic.was_init_called():
-        pdb_files = glob.glob(os.path.join(tmp_dir, "*.pdb"))
+        pdb_files = glob.glob(os.path.join(tmp_dir, "*.pdb")) + glob.glob(os.path.join(tmp_dir, "*.pdb.gz"))
         list_file = os.path.join(tmp_dir, "my_file.list")
         extra_res_fa_files = glob.glob(os.path.join(tmp_dir, "*.params"))
         patch_files = glob.glob(os.path.join(tmp_dir, "*.txt"))
