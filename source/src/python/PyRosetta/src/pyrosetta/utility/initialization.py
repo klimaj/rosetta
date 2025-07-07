@@ -312,7 +312,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                                 file_content = self.format_decode_string(data)
                                 filename = self.write_text_file(option_name, basename, file_content)
                                 flags_dict[option_name].append(filename)
-                            elif data.startswith(PyRosettaInitFileParser._prefix_binary):
+                            elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
                                 file_content = self.format_decode_binary(data)
                                 filename = self.write_binary_file(option_name, basename, file_content)
                                 flags_dict[option_name].append(filename)
@@ -326,7 +326,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                                     file_content = self.format_decode_string(subdata)
                                     filename = self.write_text_file(option_name, subbasename, file_content)
                                     file_list.append(filename)
-                                elif subdata.startswith(PyRosettaInitFileParser._prefix_binary):
+                                elif subdata.startswith(PyRosettaInitFileParserBase._prefix_binary):
                                     file_content = self.format_decode_binary(subdata)
                                     filename = self.write_binary_file(option_name, subbasename, file_content)
                                     file_list.append(filename)
