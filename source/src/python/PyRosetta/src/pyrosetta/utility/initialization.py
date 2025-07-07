@@ -217,6 +217,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         self.file_counter = 0
 
     def setup_kwargs(self, **kwargs):
+        if kwargs["dry_run"] is None:
+            kwargs["dry_run"] = False
+        if not isinstance(kwargs["dry_run"], bool):
+            raise ValueError("The 'dry_run' keyword argument parameter must be a `bool` object.")
         if kwargs["output_dir"] is None:
             output_dir = os.path.join(os.getcwd(), "pyrosetta_init_files")
         elif isinstance(kwargs["output_dir"], str):
@@ -229,10 +233,6 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             raise IOError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
             )
-        if kwargs["dry_run"] is None:
-            kwargs["dry_run"] = False
-        if not isinstance(kwargs["dry_run"], bool):
-            raise ValueError("The 'dry_run' keyword argument parameter must be a `bool` object.")
         if kwargs["database"] is None:
             kwargs["database"] = pyrosetta._rosetta_database_from_env()
         if not (isinstance(kwargs["database"], str) and os.path.isdir(kwargs["database"])):
@@ -364,8 +364,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             )
             warnings.warn(_msg, UserWarning, stacklevel=2)
 
-    def init(self):
-        options = self.get_options()
+    def print_results(self):
         if not self.kwargs["silent"]:
             if self.kwargs["dry_run"]:
                 print(
@@ -393,6 +392,16 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 ),
                 sep=os.linesep,
             )
+
+    def pprint_options(self, options):
+        if not self.kwargs["silent"]:
+            print("PyRosetta initialization options from dry run:")
+            pprint(options)
+            print("Skipping PyRosetta initialization.")
+
+    def init(self):
+        options = self.get_options()
+        self.print_results()
         self.pyrosetta_build_warning()
         pyrosetta_kwargs = dict(
             options=options,
@@ -402,10 +411,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             silent=self.kwargs["silent"],
         )
         if self.kwargs["dry_run"]:
-            if not self.kwargs["silent"]:
-                print("PyRosetta initialization options from dry run:")
-                pprint(options)
-                print("Skipping PyRosetta initialization.")
+            self.pprint_options(options)
         else:
             pyrosetta.init(**pyrosetta_kwargs)
 
@@ -414,8 +420,8 @@ class PyRosettaInitFileParser(object):
     @staticmethod
     def init_from_file(
         init_file,
-        output_dir=None,
         dry_run=None,
+        output_dir=None,
         database=None,
         set_logging_handler=None,
         notebook=None,
@@ -428,12 +434,11 @@ class PyRosettaInitFileParser(object):
             init_file: a required `str` object representing the input '.init' file.
 
         **kwargs:
+            dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files and perform PyRosetta
+                initialization. If `True`, then only print the PyRosetta initialization options that would be run if it were `False`.
+                Default: False
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
-            dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files and perform PyRosetta
-                initialization. If `True` (and `silent=False`), then only print the PyRosetta initialization options that would be
-                run if it were `False`.
-                Default: False
             database: An optional `str` object representing the path to the PyRosetta database. By default, the PyRosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the PyRosetta database path
                 may be manually input here.
@@ -450,8 +455,8 @@ class PyRosettaInitFileParser(object):
         """
         return PyRosettaInitFileReader(
             init_file,
-            output_dir=output_dir,
             dry_run=dry_run,
+            output_dir=output_dir,
             database=database,
             set_logging_handler=set_logging_handler,
             notebook=notebook,
