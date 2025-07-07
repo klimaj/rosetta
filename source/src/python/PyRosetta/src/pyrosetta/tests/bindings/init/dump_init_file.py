@@ -52,6 +52,7 @@ def main(tmp_dir):
             "Contains IGU, GNP, CYX extra residues and the 3prime5prime_methyl_phosphate patch file",
             "Version 1.0",
         ],
+        overwrite=False,
     )
     pose = pyrosetta.Pose()
     base_res_set = pose.conformation().modifiable_residue_type_set_for_conf().base_residue_types()
