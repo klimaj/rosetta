@@ -28,12 +28,13 @@ def main(tmp_dir):
     if not pyrosetta.rosetta.basic.was_init_called():
         pyrosetta.init(
             options="-run:constant_seed 1 -run:jran 1234567 -out:levels core.init:0 basic.random.init_random_generator:0",
-            extra_options="-s {0} -l {1} -extra_res_fa {2} -extra_res_fa {3} -extra_patch_fa {4}".format(
+            extra_options="-s {0} -l {1} -extra_res_fa {2} -extra_res_fa {3} -extra_patch_fa {4} -bcl {5}".format(
                 " ".join(pdb_files),
                 list_file,
                 " ".join(extra_res_fa_files[:-1]),
                 extra_res_fa_files[-1],
                 " ".join(patch_files),
+                tmp_dir,
             ),
             set_logging_handler="logging",
             notebook=None,

@@ -31,6 +31,16 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        dry_run=True,
+        database=os.path.relpath(pyrosetta._rosetta_database_from_env()),
+        set_logging_handler=None,
+        notebook=None,
+        silent=False,
+    )
+    assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `dry_run=True`"
+    pyrosetta.init_from_file(
+        init_file,
+        output_dir=init_dir,
         dry_run=False,
         database=None,
         set_logging_handler=None,
