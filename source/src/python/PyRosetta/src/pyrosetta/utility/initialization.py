@@ -361,7 +361,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             "License: {0}".format(self.init_dict["license"]),
             "Metadata: {0}".format(self.init_dict["metdata"]),
             "PyRosetta build: {0}".format(self.init_dict["pyrosetta_build"]),
-            "Date/Time created (UTC): {0}".format(self.init_dict["datetime"]),
+            "Date/Time created (UTC): {0}".format(
+                datetime.datetime.strptime(
+                    self.init_dict["datetime"],
+                    self._strftime_format,
+                ).strftime("%b %d, %Y at %I:%M:%S %p")
+            ),
             sep=os.linesep,
         )
         self.pyrosetta_build_warning()
