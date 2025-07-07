@@ -707,6 +707,9 @@ class SaveAllTest(unittest.TestCase):
                 save_all=True,
                 system_info=None,
                 pyrosetta_build=None,
+                author="Username",
+                email="test@example",
+                license="LICENSE.PyRosetta.md",
             )
             protocol_args = [my_pyrosetta_protocol] * _total_protocols
             cluster.distribute(*protocol_args)
@@ -714,6 +717,14 @@ class SaveAllTest(unittest.TestCase):
             with open(os.path.join(output_path, scorefile_name), "r") as f:
                 data = [json.loads(line) for line in f]
             self.assertEqual(len(data), _total_tasks * _total_protocols)
+            for entry in data:
+                for key in ("author", "email", "license"):
+                    self.assertIn(key, entry["instance"])
+                    self.assertNotIn(key, entry["metadata"])
+                    self.assertNotIn(key, entry["scores"])
+            self.assertEqual(entry["instance"]["author"], "Username")
+            self.assertEqual(entry["instance"]["email"], "test@example")
+            self.assertEqual(entry["instance"]["license"], "LICENSE.PyRosetta.md")
             _decoy_names = []
             for record in data:
                 self.assertDictEqual(record["scores"], {})
