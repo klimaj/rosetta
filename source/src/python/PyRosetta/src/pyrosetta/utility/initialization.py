@@ -139,6 +139,17 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                 for value in values.split():
                     if os.path.isfile(value):
                         encoded_flags_dict[option_name].append(self.encode_file(value))
+                    elif os.path.isdir(value):
+                        rel_value = os.path.relpath(value, start=os.curdir)
+                        if value != rel_value:
+                            warnings.warn(
+                                "The option '-{0}' with path '{1}' is being saved as the relative path: '{2}'.".format(
+                                    option_name, value, rel_value
+                                ),
+                                UserWarning,
+                                stacklevel=2,
+                            )
+                        encoded_flags_dict[option_name].append(rel_value)
                     else:
                         encoded_flags_dict[option_name].append(value)
         return encoded_flags_dict
@@ -403,9 +414,15 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
 
     def pprint_options(self, options):
         if not self.kwargs["silent"]:
-            print("PyRosetta initialization options from dry run:")
+            if self.kwargs["dry_run"]:
+                print("PyRosetta initialization options from dry run:")
+            else:
+                print("PyRosetta initialization options:")
             pprint(options)
-            print("Skipping PyRosetta initialization.")
+            if self.kwargs["dry_run"]:
+                print("Skipping PyRosetta initialization...")
+            else:
+                print("Running PyRosetta initialization...")
 
     def init(self):
         options = self.get_options()
@@ -418,9 +435,8 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             notebook=self.kwargs["notebook"],
             silent=self.kwargs["silent"],
         )
-        if self.kwargs["dry_run"]:
-            self.pprint_options(options)
-        else:
+        self.pprint_options(options)
+        if not self.kwargs["dry_run"]:
             pyrosetta.init(**pyrosetta_kwargs)
 
 
@@ -437,6 +453,11 @@ class PyRosettaInitFileParser(object):
     ):
         """
         Initialize PyRosetta from an '.init' file.
+
+        This method deserializes PyRosetta initialization input files from an input '.init' file into an output directory, and
+        then runs `pyrosetta.init` with the cached Rosetta command line flags pointing to files written to the output directory.
+        Therefore, it may be helpful to enable the 'dry_run' keyword argument to first inspect the Rosetta command line options
+        before committing to writing all files to disk and running PyRosetta initialization.
 
         Args:
             init_file: a required `str` object representing the input '.init' file.
@@ -482,6 +503,12 @@ class PyRosettaInitFileParser(object):
     ):
         """
         Write a PyRosetta initialization '.init' file.
+
+        This method uses the `ProtocolSettingsMetric` to get Rosetta command line flags and serializes any input files (including
+        files containing lists of files) into the output '.init' file. The Rosetta database directory is automatically excluded.
+        Only the relative paths of any input directories (from the current working directory) are saved in the Rosetta command
+        line flags (e.g., '-in:path:bcl /path/to/my/bcl_rosetta' is saved as '-in:path:bcl ./bcl_rosetta'). Therefore, it may be
+        helpful to add comments to the 'metadata' keyword argument parameter about specific PyRosetta initialization requirements.
 
         Args:
             output_filename: a required `str` object representing the output '.init' file.
