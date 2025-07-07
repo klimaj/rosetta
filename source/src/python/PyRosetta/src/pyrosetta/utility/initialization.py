@@ -24,6 +24,7 @@ import pickle
 import pyrosetta
 import warnings
 
+from pprint import pprint
 from pyrosetta.rosetta.core.simple_metrics import get_sm_data
 from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
 
@@ -210,16 +211,16 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
 class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def __init__(self, init_file, **kwargs):
         self.validate_init_was_not_called()
-        self.init_dict = self.setup_init_dict(init_file)
         self.init_file = init_file
+        self.init_dict = self.setup_init_dict(init_file)
         self.kwargs = self.setup_kwargs(**kwargs)
-        self.file_counter = -1
+        self.file_counter = 0
 
     def setup_kwargs(self, **kwargs):
         if kwargs["output_dir"] is None:
             output_dir = os.path.join(os.getcwd(), "pyrosetta_init_files")
         elif isinstance(kwargs["output_dir"], str):
-            output_dir = os.path.abspath(output_dir)
+            output_dir = os.path.abspath(kwargs["output_dir"])
         else:
             raise TypeError("The 'output_dir' keyword argument parameter must be a `str` object.")
         if not os.path.isdir(output_dir):
@@ -228,6 +229,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             raise IOError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
             )
+        if kwargs["dry_run"] is None:
+            kwargs["dry_run"] = False
+        if not isinstance(kwargs["dry_run"], bool):
+            raise ValueError("The 'dry_run' keyword argument parameter must be a `bool` object.")
         if kwargs["database"] is None:
             kwargs["database"] = pyrosetta._rosetta_database_from_env()
         if not (isinstance(kwargs["database"], str) and os.path.isdir(kwargs["database"])):
@@ -276,15 +281,17 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         return self.decode_string(value.split(PyRosettaInitFileParserBase._prefix_string)[-1])
 
     def setup_new_file(self, option_name, basename):
-        self.file_counter += 1
         file = os.path.join(self.kwargs["output_dir"], option_name.replace(":", "_"), str(self.file_counter), basename)
-        os.makedirs(os.path.dirname(file), exist_ok=False)
+        self.file_counter += 1
+        if not self.kwargs["dry_run"]:
+            os.makedirs(os.path.dirname(file), exist_ok=False)
         return file
 
     def write_file(self, option_name, basename, file_content, mode="w"):
         new_file = self.setup_new_file(option_name, basename)
-        with open(new_file, mode) as f:
-            f.write(file_content)
+        if not self.kwargs["dry_run"]:
+            with open(new_file, mode) as f:
+                f.write(file_content)
         return new_file
 
     def write_text_file(self, *args):
@@ -298,34 +305,38 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         flags_dict = collections.defaultdict(list)
         for option_name, values in encoded_flags_dict.items():
             for value in values:
-                assert isinstance(value, dict), "Cannot read malformed initialization file: {0}".format(self.init_file)
-                for basename, data in value.items():
-                    if isinstance(data, str):
-                        if data.startswith(PyRosettaInitFileParserBase._prefix_string):
-                            file_content = self.format_decode_string(data)
+                if isinstance(value, dict):
+                    for basename, data in value.items():
+                        if isinstance(data, str):
+                            if data.startswith(PyRosettaInitFileParserBase._prefix_string):
+                                file_content = self.format_decode_string(data)
+                                filename = self.write_text_file(option_name, basename, file_content)
+                                flags_dict[option_name].append(filename)
+                            elif data.startswith(PyRosettaInitFileParser._prefix_binary):
+                                file_content = self.format_decode_binary(data)
+                                filename = self.write_binary_file(option_name, basename, file_content)
+                                flags_dict[option_name].append(filename)
+                            else:
+                                flags_dict[option_name].append(data)
+                        elif isinstance(data, dict):
+                            file_list = []
+                            for subbasename, subdata in data.items():
+                                assert isinstance(subdata, str), "Cannot read malformed initialization file: {0}".format(self.init_file)
+                                if subdata.startswith(PyRosettaInitFileParserBase._prefix_string):
+                                    file_content = self.format_decode_string(subdata)
+                                    filename = self.write_text_file(option_name, subbasename, file_content)
+                                    file_list.append(filename)
+                                elif subdata.startswith(PyRosettaInitFileParser._prefix_binary):
+                                    file_content = self.format_decode_binary(subdata)
+                                    filename = self.write_binary_file(option_name, subbasename, file_content)
+                                    file_list.append(filename)
+                            file_content = os.linesep.join(file_list) + os.linesep
                             filename = self.write_text_file(option_name, basename, file_content)
                             flags_dict[option_name].append(filename)
-                        elif data.startswith(PyRosettaInitFileParser._prefix_binary):
-                            file_content = self.format_decode_binary(data)
-                            filename = self.write_binary_file(option_name, basename, file_content)
-                            flags_dict[option_name].append(filename)
-                        else:
-                            flags_dict[option_name].append(data)
-                    elif isinstance(data, dict):
-                        file_list = []
-                        for subbasename, subdata in data.items():
-                            assert isinstance(subdata, str), "Cannot read malformed initialization file: {0}".format(self.init_file)
-                            if subdata.startswith(PyRosettaInitFileParserBase._prefix_string):
-                                file_content = self.format_decode_string(subdata)
-                                filename = self.write_text_file(option_name, subbasename, file_content)
-                                file_list.append(filename)
-                            elif subdata.startswith(PyRosettaInitFileParser._prefix_binary):
-                                file_content = self.format_decode_binary(subdata)
-                                filename = self.write_binary_file(option_name, subbasename, file_content)
-                                file_list.append(filename)
-                        file_content = os.linesep.join(file_list) + os.linesep
-                        filename = self.write_text_file(option_name, basename, file_content)
-                        flags_dict[option_name].append(filename)
+                elif isinstance(value, str):
+                    flags_dict[option_name].append(value)
+                else:
+                    raise RuntimeError("Cannot read malformed initialization file: {0}".format(self.init_file))
         return flags_dict
 
     def get_options(self):
@@ -354,37 +365,57 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             warnings.warn(_msg, UserWarning, stacklevel=2)
 
     def init(self):
-        print(
-            "Initializing PyRosetta from file: {1}".format(self.init_file),
-            "Author(s): {0}".format(self.init_dict["author"]),
-            "E-mail(s): {0}".format(self.init_dict["email"]),
-            "License: {0}".format(self.init_dict["license"]),
-            "Metadata: {0}".format(self.init_dict["metdata"]),
-            "PyRosetta build: {0}".format(self.init_dict["pyrosetta_build"]),
-            "Date/Time created (UTC): {0}".format(
-                datetime.datetime.strptime(
-                    self.init_dict["datetime"],
-                    self._strftime_format,
-                ).strftime("%b %d, %Y at %I:%M:%S %p")
-            ),
-            sep=os.linesep,
-        )
+        options = self.get_options()
+        if not self.kwargs["silent"]:
+            if self.kwargs["dry_run"]:
+                print(
+                    "Dry run PyRosetta initialization from file: {0}".format(self.init_file),
+                    "Parsed {0} PyRosetta initialization input files.".format(self.file_counter),
+                    sep=os.linesep,
+                )
+            else:
+                print(
+                    "Initializing PyRosetta from file: {0}".format(self.init_file),
+                    "Parsed {0} PyRosetta initialization input files written to: {1}".format(self.file_counter, self.kwargs["output_dir"]),
+                    sep=os.linesep,
+                )
+            print(
+                "Author(s): {0}".format(self.init_dict["author"]),
+                "E-mail(s): {0}".format(self.init_dict["email"]),
+                "License: {0}".format(self.init_dict["license"]),
+                "Metadata: {0}".format(self.init_dict["metadata"]),
+                "PyRosetta build: {0}".format(self.init_dict["pyrosetta_build"]),
+                "Date/Time created (UTC): {0}".format(
+                    datetime.datetime.strptime(
+                        self.init_dict["datetime"],
+                        self._strftime_format,
+                    ).strftime("%b %d, %Y at %I:%M:%S %p")
+                ),
+                sep=os.linesep,
+            )
         self.pyrosetta_build_warning()
-        pyrosetta.init(
-            options=self.get_options(),
+        pyrosetta_kwargs = dict(
+            options=options,
             extra_options="",
             set_logging_handler=self.kwargs["set_logging_handler"],
             notebook=self.kwargs["notebook"],
             silent=self.kwargs["silent"],
         )
+        if self.kwargs["dry_run"]:
+            if not self.kwargs["silent"]:
+                print("PyRosetta initialization options from dry run:")
+                pprint(options)
+                print("Skipping PyRosetta initialization.")
+        else:
+            pyrosetta.init(**pyrosetta_kwargs)
 
 
 class PyRosettaInitFileParser(object):
     @staticmethod
     def init_from_file(
-        self,
         init_file,
         output_dir=None,
+        dry_run=None,
         database=None,
         set_logging_handler=None,
         notebook=None,
@@ -399,6 +430,10 @@ class PyRosettaInitFileParser(object):
         **kwargs:
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
+            dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files and perform PyRosetta
+                initialization. If `True` (and `silent=False`), then only print the PyRosetta initialization options that would be
+                run if it were `False`.
+                Default: False
             database: An optional `str` object representing the path to the PyRosetta database. By default, the PyRosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the PyRosetta database path
                 may be manually input here.
@@ -413,9 +448,10 @@ class PyRosettaInitFileParser(object):
                 If `None`, then the default `pyrosetta.init` keyword argument parameter is used.
                 Default: None
         """
-        PyRosettaInitFileReader(
+        return PyRosettaInitFileReader(
             init_file,
             output_dir=output_dir,
+            dry_run=dry_run,
             database=database,
             set_logging_handler=set_logging_handler,
             notebook=notebook,
@@ -424,7 +460,6 @@ class PyRosettaInitFileParser(object):
 
     @staticmethod
     def dump_init_file(
-        self,
         output_filename,
         author=None,
         email=None,
@@ -442,13 +477,12 @@ class PyRosettaInitFileParser(object):
                 Default: None
             email: An optional `str` object representing the author's/authors' email address(es).
                 Default: None
-            license: An optional `str` object representing the license for the output '.init' file.
+            license: An optional `str` object representing the license(s) for the output '.init' file.
                 Default: None
-            metadata: An optional `dict` object representing any additional metadata to save to the output '.init' file,
-                which must be JSON-encodable.
-                Default: None
+            metadata: An optional JSON-serializable object representing any additional metadata to save to the output '.init' file.
+                Default: {}
         """
-        PyRosettaInitFileWriter(
+        return PyRosettaInitFileWriter(
             output_filename,
             author=author,
             email=email,
