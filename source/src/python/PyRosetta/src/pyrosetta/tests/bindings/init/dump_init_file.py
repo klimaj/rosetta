@@ -17,15 +17,15 @@ import pyrosetta
 
 
 def main(tmp_dir):
+    pdb_files = glob.glob(os.path.join(tmp_dir, "*.pdb")) + glob.glob(os.path.join(tmp_dir, "*.pdb.gz"))
+    assert len(pdb_files) > 0, "PDB files do not exist."
+    list_file = os.path.join(tmp_dir, "my_file.list")
+    assert os.path.isfile(list_file), "List file does not exist."
+    extra_res_fa_files = glob.glob(os.path.join(tmp_dir, "*.params"))
+    assert len(extra_res_fa_files) > 0, "Extra residue files do not exist."
+    patch_files = glob.glob(os.path.join(tmp_dir, "*.txt"))
+    assert len(patch_files) > 0, "Patch files do not exist."
     if not pyrosetta.rosetta.basic.was_init_called():
-        pdb_files = glob.glob(os.path.join(tmp_dir, "*.pdb")) + glob.glob(os.path.join(tmp_dir, "*.pdb.gz"))
-        list_file = os.path.join(tmp_dir, "my_file.list")
-        extra_res_fa_files = glob.glob(os.path.join(tmp_dir, "*.params"))
-        patch_files = glob.glob(os.path.join(tmp_dir, "*.txt"))
-        assert len(pdb_files) > 0, "PDB files do not exist."
-        assert os.path.isfile(list_file), "List file does not exist."
-        assert len(extra_res_fa_files) > 0, "Extra residue files do not exist."
-        assert len(patch_files) > 0, "Patch files do not exist."
         pyrosetta.init(
             options="-run:constant_seed 1 -run:jran 1234567 -out:levels core.init:0 basic.random.init_random_generator:0",
             extra_options="-s {0} -l {1} -extra_res_fa {2} -extra_res_fa {3} -extra_patch_fa {4}".format(
@@ -41,7 +41,7 @@ def main(tmp_dir):
         )
     else:
         raise RuntimeError("PyRosetta is already initialized.")
-    
+
     init_file = os.path.join(tmp_dir, "my.init")
     pyrosetta.dump_init_file(
         init_file,
