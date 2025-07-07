@@ -43,8 +43,8 @@ class PyRosettaInitFileParserBase(object):
 class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def __init__(self, output_filename, **kwargs):
         self.validate_init_was_called()
-        self.output_filename = self.setup_output_filename(output_filename)
         self.kwargs = self.setup_kwargs(**kwargs)
+        self.output_filename = self.setup_output_filename(output_filename)
         self.encoded_flags_dict = self.get_encoded_flags_dict()
 
     def setup_output_filename(self, output_filename):
@@ -56,7 +56,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             raise NameError(
                 "Output file must end with the '{0}' filename extension.".format(self._init_file_extension)
             )
-        if os.path.isfile(output_filename):
+        if os.path.isfile(output_filename) and not self.kwargs["overwrite"]:
             raise FileExistsError(
                 "Output '{0}' file already exists! Please remove the file and try again: {1}".format(
                     self._init_file_extension, output_filename
@@ -80,6 +80,12 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             self.assert_metadata_json_serializable(kwargs["metadata"])
         kwargs["pyrosetta_build"] = self.get_pyrosetta_build()
         kwargs["datetime"] = self.get_datetime_now()
+        if "overwrite" in kwargs and kwargs["overwrite"] is None:
+            kwargs["overwrite"] = False
+        elif not isinstance(kwargs["overwrite"], bool):
+            raise TypeError(
+                "The 'overwrite' keyword argument parameter must be a `bool` object. Received: {1}".format(type(kwargs["overwrite"]))
+            )
         return kwargs
 
     def assert_metadata_json_serializable(self, data):
@@ -200,12 +206,14 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             )
 
     def dump(self):
+        overwrite = self.kwargs.pop("overwrite")
         data_dict = {
             **self.kwargs,
             "flags": self.encoded_flags_dict,
         }
-        with open(self.output_filename, "w") as f:
-            json.dump(data_dict, f, indent=4)
+        if (not os.path.isfile(self.output_filename)) or overwrite:
+            with open(self.output_filename, "w") as f:
+                json.dump(data_dict, f, indent=4)
 
 
 class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
@@ -470,6 +478,7 @@ class PyRosettaInitFileParser(object):
         email=None,
         license=None,
         metadata=None,
+        overwrite=None,
     ):
         """
         Write a PyRosetta initialization '.init' file.
@@ -486,6 +495,9 @@ class PyRosettaInitFileParser(object):
                 Default: None
             metadata: An optional JSON-serializable object representing any additional metadata to save to the output '.init' file.
                 Default: {}
+            overwrite: An optional `bool` object specifying whether or not to overwrite the output '.init' file if it exists.
+                If `False`, then raise an error if the output '.init' file already exists.
+                Default: False
         """
         return PyRosettaInitFileWriter(
             output_filename,
@@ -493,4 +505,5 @@ class PyRosettaInitFileParser(object):
             email=email,
             license=license,
             metadata=metadata,
+            overwrite=overwrite,
         ).dump()
