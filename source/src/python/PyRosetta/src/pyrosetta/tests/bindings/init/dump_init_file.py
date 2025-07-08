@@ -27,7 +27,12 @@ def main(tmp_dir):
     assert len(patch_files) > 0, "Patch files do not exist."
     if not pyrosetta.rosetta.basic.was_init_called():
         pyrosetta.init(
-            options="-run:constant_seed 1 -run:jran 1234567 -out:levels core.init:0 basic.random.init_random_generator:0",
+            options=(
+                "-run:constant_seed 1 "
+                "-run:jran 1234567 "
+                "-override_database_params 1 "
+                "-out:levels core.init:0 basic.random.init_random_generator:0"
+            ),
             extra_options="-s {0} -l {1} -extra_res_fa {2} -extra_res_fa {3} -extra_patch_fa {4} -bcl {5}".format(
                 " ".join(pdb_files),
                 list_file,
