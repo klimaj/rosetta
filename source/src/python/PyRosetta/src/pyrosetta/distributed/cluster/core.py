@@ -208,6 +208,17 @@ Args:
     dry_run: A `bool` object specifying whether or not to save '.pdb' files to
         disk. If `True`, then do not write '.pdb' or '.pdb.bz2' files to disk.
         Default: False
+    author: An optional `str` object specifying the author(s) of the simulation that is
+        written to the full simulation records and the PyRosetta initialization '.init' file.
+        Default: ""
+    email: An optional `str` object specifying the email address(es) of the author(s) of
+        the simulation that is written to the full simulation records and the PyRosetta
+        initialization '.init' file.
+        Default: ""
+    license: An optional `str` object specifying the license of the output data of the
+        simulation that is written to the full simulation records and PyRosetta
+        initialization '.init' file (e.g., "ODC-ODbL", "CC BY-ND", or "CDLA Permissive-2.0").
+        Default: ""
 
 Returns:
     A PyRosettaCluster instance.
