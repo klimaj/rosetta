@@ -214,6 +214,7 @@ def init(options='-ex1 -ex2aro', extra_options='', set_logging_handler=None, not
 
 init_from_file = PyRosettaInitFileParser.init_from_file
 dump_init_file = PyRosettaInitFileParser.dump_init_file
+get_options_from_init_file = PyRosettaInitFileParser.get_options_from_init_file
 
 # FIXME: create 'version' struct in utility instead
 def _version_string():
