@@ -286,7 +286,7 @@ class IO(Generic[G]):
 
     def _write_init_file(self, filename: str) -> None:
         """Write compressed PyRosetta initialization input files to the input filename."""
-        if not self.dry_run:
+        if filename != "" and not self.dry_run:
             try:
                 dump_init_file(
                     filename,
