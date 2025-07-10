@@ -45,7 +45,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         self.validate_init_was_called()
         self.kwargs = self.setup_kwargs(**kwargs)
         self.output_filename = self.setup_output_filename(output_filename)
-        self.encoded_flags_dict = self.get_encoded_flags_dict()
+        self.encoded_options_dict = self.get_encoded_options_dict()
 
     def setup_output_filename(self, output_filename):
         if not isinstance(output_filename, str):
@@ -126,19 +126,19 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         data = dict(sm_data.get_composite_string_metric_data())
         return dict(data["{0}_opt".format(__class__.__name__)])
 
-    def get_flags_dict(self):
+    def get_options_dict(self):
         pose = self.init_pose()
         pose = self.apply_protocol_settings_metric(pose)
         return self.get_protocol_settings_dict(pose)
 
-    def get_encoded_flags_dict(self):
-        flags_dict = self.get_flags_dict()
-        encoded_flags_dict = collections.defaultdict(list)
-        for option_name, values in flags_dict.items():
+    def get_encoded_options_dict(self):
+        options_dict = self.get_options_dict()
+        encoded_options_dict = collections.defaultdict(list)
+        for option_name, values in options_dict.items():
             if option_name != self._database_option_name:
                 for value in values.split():
                     if os.path.isfile(value):
-                        encoded_flags_dict[option_name].append(self.encode_file(value))
+                        encoded_options_dict[option_name].append(self.encode_file(value))
                     elif os.path.isdir(value):
                         rel_value = os.path.relpath(value, start=os.curdir)
                         if value != rel_value:
@@ -149,10 +149,10 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                                 UserWarning,
                                 stacklevel=2,
                             )
-                        encoded_flags_dict[option_name].append(rel_value)
+                        encoded_options_dict[option_name].append(rel_value)
                     else:
-                        encoded_flags_dict[option_name].append(value)
-        return encoded_flags_dict
+                        encoded_options_dict[option_name].append(value)
+        return encoded_options_dict
 
     def is_file_containing_list_of_files(self, filename):
         try:
@@ -213,14 +213,14 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         if not pyrosetta.rosetta.basic.was_init_called():
             raise RuntimeError(
                 "PyRosetta must be already initialized to dump an initialization file. "
-                + "Please run `pyrosetta.init()` with custom flags and try again."
+                + "Please run `pyrosetta.init()` with custom options and try again."
             )
 
     def dump(self):
         overwrite = self.kwargs.pop("overwrite")
         data_dict = {
             **self.kwargs,
-            "flags": self.encoded_flags_dict,
+            "options": self.encoded_options_dict,
         }
         if (not os.path.isfile(self.output_filename)) or overwrite:
             with open(self.output_filename, "w") as f:
@@ -282,10 +282,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 "Please ensure that `pyrosetta.init()` was not already called and try again."
             )
 
-    def get_encoded_flags_dict(self):
-        encoded_flags_dict = self.init_dict["flags"]
-        encoded_flags_dict[self._database_option_name] = [self.kwargs["database"]]
-        return encoded_flags_dict
+    def get_encoded_options_dict(self):
+        encoded_options_dict = self.init_dict["options"]
+        encoded_options_dict[self._database_option_name] = [self.kwargs["database"]]
+        return encoded_options_dict
 
     def decode_binary(self, string):
         return base64.b64decode(string, validate=True)
@@ -319,10 +319,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def write_binary_file(self, *args):
         return self.write_file(*args, mode="wb")
 
-    def get_flags_dict(self):
-        encoded_flags_dict = self.get_encoded_flags_dict()
-        flags_dict = collections.defaultdict(list)
-        for option_name, values in encoded_flags_dict.items():
+    def get_options_dict(self):
+        encoded_options_dict = self.get_encoded_options_dict()
+        options_dict = collections.defaultdict(list)
+        for option_name, values in encoded_options_dict.items():
             for value in values:
                 if isinstance(value, dict):
                     for basename, data in value.items():
@@ -330,13 +330,13 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                             if data.startswith(PyRosettaInitFileParserBase._prefix_string):
                                 file_content = self.format_decode_string(data)
                                 filename = self.write_text_file(option_name, basename, file_content)
-                                flags_dict[option_name].append(filename)
+                                options_dict[option_name].append(filename)
                             elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
                                 file_content = self.format_decode_binary(data)
                                 filename = self.write_binary_file(option_name, basename, file_content)
-                                flags_dict[option_name].append(filename)
+                                options_dict[option_name].append(filename)
                             else:
-                                flags_dict[option_name].append(data)
+                                options_dict[option_name].append(data)
                         elif isinstance(data, dict):
                             file_list = []
                             for subbasename, subdata in data.items():
@@ -351,19 +351,19 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                                     file_list.append(filename)
                             file_content = os.linesep.join(file_list) + os.linesep
                             filename = self.write_text_file(option_name, basename, file_content)
-                            flags_dict[option_name].append(filename)
+                            options_dict[option_name].append(filename)
                 elif isinstance(value, str):
-                    flags_dict[option_name].append(value)
+                    options_dict[option_name].append(value)
                 else:
                     raise RuntimeError("Cannot read malformed initialization file: {0}".format(self.init_file))
-        return flags_dict
+        return options_dict
 
     def get_options(self):
-        flags_dict = self.get_flags_dict()
+        options_dict = self.get_options_dict()
         return " ".join(
             [
                 "-{0} {1}".format(option_name, " ".join(values))
-                for option_name, values in flags_dict.items()
+                for option_name, values in options_dict.items()
             ]
         )
 
@@ -455,7 +455,7 @@ class PyRosettaInitFileParser(object):
         Initialize PyRosetta from an '.init' file.
 
         This method deserializes PyRosetta initialization input files from an input '.init' file into an output directory, and
-        then runs `pyrosetta.init` with the cached Rosetta command line flags pointing to files written to the output directory.
+        then runs `pyrosetta.init` with the cached Rosetta command line options pointing to files written to the output directory.
         Therefore, it may be helpful to enable the 'dry_run' keyword argument to first inspect the Rosetta command line options
         before committing to writing all files to disk and running PyRosetta initialization.
 
@@ -504,10 +504,10 @@ class PyRosettaInitFileParser(object):
         """
         Write a PyRosetta initialization '.init' file.
 
-        This method uses the `ProtocolSettingsMetric` to get Rosetta command line flags and serializes any input files (including
+        This method uses the `ProtocolSettingsMetric` to get Rosetta command line options and serializes any input files (including
         files containing lists of files) into the output '.init' file. The Rosetta database directory is automatically excluded.
         Only the relative paths of any input directories (from the current working directory) are saved in the Rosetta command
-        line flags (e.g., '-in:path:bcl /path/to/my/bcl_rosetta' is saved as '-in:path:bcl ./bcl_rosetta'). Therefore, it may be
+        line options (e.g., '-in:path:bcl /path/to/my/bcl_rosetta' is saved as '-in:path:bcl ./bcl_rosetta'). Therefore, it may be
         helpful to add comments to the 'metadata' keyword argument parameter about specific PyRosetta initialization requirements.
 
         Args:
