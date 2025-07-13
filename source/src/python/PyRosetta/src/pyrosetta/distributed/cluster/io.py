@@ -71,6 +71,7 @@ class IO(Generic[G]):
         assert isinstance(instance_state, dict)
         instance_state.pop("client", None)
         instance_state.pop("clients", None)
+        instance_state.pop("init_file", None)
         instance_kwargs = self.serializer.deepcopy_kwargs(instance_state)
         for i in self.__attrs_attrs__:
             if not i.init:
@@ -302,9 +303,9 @@ class IO(Generic[G]):
                 )
                 logging.debug("Successfully ran `pyrosetta.dump_init_file` on the host node.")
             except BaseException as ex:
-                logging.warning(
-                    f"{ex}. `pyrosetta.dump_init_file` did not run successfully, "
-                    + "so PyRosetta initialization input data was not saved! "
-                    + "It is recommended to run `pyrosetta.dump_init_file` to reproduce "
-                    + "PyRosetta initialization options on the host node later."
+                logging.error(
+                    f"{type(ex).__name__}: {ex}. `pyrosetta.dump_init_file` did not run successfully, "
+                    + "so PyRosetta initialization input data may not be saved! It is recommended to run "
+                    + "`pyrosetta.dump_init_file` to reproduce PyRosetta initialization options on the "
+                    + "host node later."
                 )
