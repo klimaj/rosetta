@@ -29,6 +29,7 @@ class InitFromFileTest(unittest.TestCase):
             cmd = "{0} {1} --tmp_dir {2}".format(sys.executable, test_script, tmp_dir.name)
             p = subprocess.run(cmd, shell=True)
             print("Return code: {0}".format(p.returncode))
+            self.assertEqual(p.returncode, 0, msg=f"Test script failed: {test_script}")
         tmp_dir.cleanup()
 
 

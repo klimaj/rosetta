@@ -48,6 +48,32 @@ def main(tmp_dir):
     else:
         raise RuntimeError("PyRosetta is already initialized.")
 
+    init_options = pyrosetta.get_init_options(compressed=True, as_dict=True)
+    assert isinstance(init_options, dict)
+    assert "in:path:database" in init_options.keys()
+    print("Compressed PyRosetta initialization options:", init_options, sep=os.linesep)
+
+    init_options = pyrosetta.get_init_options(compressed=False, as_dict=True)
+    assert isinstance(init_options, dict)
+    assert "in:path:database" in init_options.keys()
+    print("Decompressed PyRosetta initialization options:", init_options, sep=os.linesep)
+
+    init_options = pyrosetta.get_init_options(compressed=False, as_dict=False)
+    assert isinstance(init_options, str)
+    assert "-in:path:database" in init_options
+    print("Decompressed, flattened PyRosetta initialization options:", init_options, sep=os.linesep)
+
+    try:
+        pyrosetta.get_init_options(compressed=True, as_dict=False)
+        ex = None
+    except ValueError as e:
+        ex = e
+    finally:
+        if ex is None:
+            raise RuntimeError(f"Did not catch `ValueError`.")
+        else:
+            print(f"Successfully caught `{type(ex).__name__}: {ex}`")
+
     init_file = os.path.join(tmp_dir, "my.init")
     pyrosetta.dump_init_file(
         init_file,
