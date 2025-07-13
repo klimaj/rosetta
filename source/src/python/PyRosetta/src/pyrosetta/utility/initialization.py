@@ -279,7 +279,8 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         if pyrosetta.rosetta.basic.was_init_called():
             raise RuntimeError(
                 "PyRosetta must not be already initialized to initialize from a file. "
-                "Please ensure that `pyrosetta.init()` was not already called and try again."
+                "Please ensure that `pyrosetta.init()` was not already called (e.g., "
+                "if using a Jupyter notebook, please restart the kernel) and try again."
             )
 
     def get_encoded_options_dict(self):
@@ -392,11 +393,14 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                     sep=os.linesep,
                 )
             else:
-                print(
-                    "Initializing PyRosetta from file: {0}".format(self.init_file),
-                    "Parsed {0} PyRosetta initialization input files written to: {1}".format(self.file_counter, self.kwargs["output_dir"]),
-                    sep=os.linesep,
-                )
+                print("Initializing PyRosetta from file: {0}".format(self.init_file))
+                if self.file_counter == 0:
+                    print("Parsed {0} PyRosetta initialization input files.".format(self.file_counter))
+                else:
+                    print("Parsed {0} PyRosetta initialization input files written to: {1}".format(
+                            self.file_counter, self.kwargs["output_dir"]
+                        )
+                    )
             print(
                 "Author(s): {0}".format(self.init_dict["author"]),
                 "E-mail(s): {0}".format(self.init_dict["email"]),
@@ -513,8 +517,8 @@ class PyRosettaInitFileParser(object):
 
         **kwargs:
             dry_run: An optional `bool` object specifying whether or not to write PyRosetta initialization input files to disk.
-                If `True`, then the PyRosetta initialization input files will not be written to disk, and therefore the returned
-                options can be simply inspected (or input manually into `pyrosetta.init` if options do not contain input files).
+                If `True`, then the PyRosetta initialization input files will not be written to disk so the returned options
+                can be inspected (or input manually into `pyrosetta.init` if options do not contain input files).
                 Default: True
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files if
                 the 'dry_run' keyword argument is `False`.
