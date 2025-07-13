@@ -22,6 +22,7 @@ import json
 import os
 import pickle
 import pyrosetta
+import tempfile
 import warnings
 
 from pprint import pprint
@@ -45,7 +46,6 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         self.validate_init_was_called()
         self.kwargs = self.setup_kwargs(**kwargs)
         self.output_filename = self.setup_output_filename(output_filename)
-        self.encoded_options_dict = self.get_encoded_options_dict()
 
     def setup_output_filename(self, output_filename):
         if not isinstance(output_filename, str):
@@ -131,27 +131,35 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         pose = self.apply_protocol_settings_metric(pose)
         return self.get_protocol_settings_dict(pose)
 
+    def get_options_str(self):
+        options_dict = self.get_options_dict()
+        return " ".join(
+            [
+                "-{0} {1}".format(option_name, values)
+                for option_name, values in options_dict.items()
+            ]
+        )
+
     def get_encoded_options_dict(self):
         options_dict = self.get_options_dict()
         encoded_options_dict = collections.defaultdict(list)
         for option_name, values in options_dict.items():
-            if option_name != self._database_option_name:
-                for value in values.split():
-                    if os.path.isfile(value):
-                        encoded_options_dict[option_name].append(self.encode_file(value))
-                    elif os.path.isdir(value):
-                        rel_value = os.path.relpath(value, start=os.curdir)
-                        if value != rel_value:
-                            warnings.warn(
-                                "The option '-{0}' with path '{1}' is being saved as the relative path: '{2}'.".format(
-                                    option_name, value, rel_value
-                                ),
-                                UserWarning,
-                                stacklevel=2,
-                            )
-                        encoded_options_dict[option_name].append(rel_value)
-                    else:
-                        encoded_options_dict[option_name].append(value)
+            for value in values.split():
+                if os.path.isfile(value):
+                    encoded_options_dict[option_name].append(self.encode_file(value))
+                elif os.path.isdir(value):
+                    rel_value = os.path.relpath(value, start=os.curdir)
+                    if value != rel_value and option_name != self._database_option_name:
+                        warnings.warn(
+                            "The option '-{0}' with path '{1}' is being cached as the relative path: '{2}'.".format(
+                                option_name, value, rel_value
+                            ),
+                            UserWarning,
+                            stacklevel=1,
+                        )
+                    encoded_options_dict[option_name].append(rel_value)
+                else:
+                    encoded_options_dict[option_name].append(value)
         return encoded_options_dict
 
     def is_file_containing_list_of_files(self, filename):
@@ -217,10 +225,12 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             )
 
     def dump(self):
+        encoded_options_dict = self.get_encoded_options_dict()
+        encoded_options_dict.pop(self._database_option_name, None)
         overwrite = self.kwargs.pop("overwrite")
         data_dict = {
             **self.kwargs,
-            "options": self.encoded_options_dict,
+            "options": encoded_options_dict,
         }
         if (not os.path.isfile(self.output_filename)) or overwrite:
             with open(self.output_filename, "w") as f:
@@ -589,3 +599,43 @@ class PyRosettaInitFileParser(object):
             metadata=metadata,
             overwrite=overwrite,
         ).dump()
+
+    @staticmethod
+    def get_init_options(compressed=False, as_dict=False):
+        """
+        Get the currently initialized PyRosetta initialization options. This method uses the `ProtocolSettingsMetric` SimpleMetric
+        to get the Rosetta command line options (including the PyRosetta database).
+
+        **kwargs:
+            compressed: An optional `bool` object specifying whether or not to compress any input files (including files containing
+                lists of files) in memory, and return only the relative paths of any input directories (from the current working
+                directory) in the Rosetta command line options (e.g., '-in:path:bcl /path/to/current/directory/bcl_rosetta' is
+                returned as '-in:path:bcl ./bcl_rosetta').
+                Default: False
+            as_dict: An optional `bool` object specifying whether or not to return the PyRosetta initialization options as a `dict`
+                object, otherwise options are returned as a `str` object.
+                Default: False
+        """
+        if not isinstance(compressed, bool):
+            raise ValueError(f"The 'compressed' keyword argument parameter must be a `bool` object. Received: {type(compressed)}")
+        if not isinstance(as_dict, bool):
+            raise ValueError(f"The 'as_dict' keyword argument parameter must be a `bool` object. Received: {type(as_dict)}")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            writer = PyRosettaInitFileWriter(
+                os.path.join(tmp_dir, "tmp.init"),
+                author=None,
+                email=None,
+                license=None,
+                metadata=None,
+                overwrite=False,
+            )
+        if compressed:
+            if as_dict:
+                return writer.get_encoded_options_dict()
+            else:
+                raise ValueError("Cannot flatten compressed PyRosetta initialization options into a `str` object.")
+        else:
+            if as_dict:
+                return writer.get_options_dict()
+            else:
+                return writer.get_options_str()
