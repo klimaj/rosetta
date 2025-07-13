@@ -678,6 +678,8 @@ class SaveAllTest(unittest.TestCase):
             author = "Username"
             email = "test@example"
             license = "LICENSE.PyRosetta.md"
+            project_name = None
+            simulation_name = "SaveAllTest"
             cluster = PyRosettaCluster(
                 tasks=create_tasks,
                 input_packed_pose=io.pose_from_sequence("TESTING"),
@@ -696,8 +698,8 @@ class SaveAllTest(unittest.TestCase):
                 compressed=True,
                 logging_level="CRITICAL",
                 scorefile_name=scorefile_name,
-                project_name=None,
-                simulation_name="SaveAllTest",
+                project_name=project_name,
+                simulation_name=simulation_name,
                 environment=None,
                 output_path=output_path,
                 simulation_records_in_scorefile=True,
@@ -728,8 +730,13 @@ class SaveAllTest(unittest.TestCase):
             self.assertEqual(record["instance"]["author"], author)
             self.assertEqual(record["instance"]["email"], email)
             self.assertEqual(record["instance"]["license"], license)
-            init_file = os.path.join(output_path, "PyRosettaCluster_SaveAllTest_pyrosetta.init")
+            _project_name = "PyRosettaCluster" if project_name is None else project_name
+            _simulation_name = "PyRosettaCluster" if simulation_name is None else simulation_name
+            init_file = os.path.join(output_path, f"{_project_name}_{_simulation_name}_pyrosetta.init")
+            self.assertNotIn("init_file", record["instance"])
+            self.assertIn("init_file", record["metadata"])
             self.assertTrue(os.path.isfile(init_file))
+            self.assertEqual(record["metadata"]["init_file"], init_file)
             with open(init_file, "r") as f:
                 init_data = json.load(f)
             self.assertEqual(init_data["author"], author)
