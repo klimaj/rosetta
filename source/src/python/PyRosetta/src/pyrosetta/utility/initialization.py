@@ -404,7 +404,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             print(
                 "Author(s): {0}".format(self.init_dict["author"]),
                 "E-mail(s): {0}".format(self.init_dict["email"]),
-                "License: {0}".format(self.init_dict["license"]),
+                "License(s): {0}".format(self.init_dict["license"]),
                 "Metadata: {0}".format(self.init_dict["metadata"]),
                 "PyRosetta build: {0}".format(self.init_dict["pyrosetta_build"]),
                 "Date/Time created (UTC): {0}".format(
