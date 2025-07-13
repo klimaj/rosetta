@@ -209,7 +209,7 @@ Args:
         disk. If `True`, then do not write '.pdb' or '.pdb.bz2' files to disk.
         Default: False
     init_file: A `str` object specifying the output '.init' file path. If a `NoneType`
-        object (or an empty `str` object ('')) is provided, or `dry_run=True` then skip
+        object (or an empty `str` object ('')) is provided, or `dry_run=True`, then skip
         writing an output '.init' file upon PyRosettaCluster instantiation. If skipped,
         it is recommended to run `pyrosetta.dump_init_file` before or after the simulation.
         Default: `output_path`/`project_name`_`simulation_name`_pyrosetta.init
