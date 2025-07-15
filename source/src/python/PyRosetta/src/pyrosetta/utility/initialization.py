@@ -22,6 +22,7 @@ import json
 import os
 import pickle
 import pyrosetta
+import re
 import tempfile
 import warnings
 
@@ -92,7 +93,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         try:
             json.dumps(data)
         except:
-            raise TypeError("Input 'metadata' keyword argument parameter must be JSON-serializable.")
+            raise ValueError("Input 'metadata' keyword argument parameter must be JSON-serializable.")
 
     def get_datetime_now(self):
         return datetime.datetime.now(datetime.timezone.utc).strftime(self._strftime_format)
@@ -184,36 +185,76 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def encode_string(self, string):
         return self.encode_bytestring(pickle.dumps(string))
 
-    def format_encode_bytestring(self, file_handle):
+    def encode_object(self, obj):
+        return self.encode_string(obj)
+
+    def format_encode_bytestring(self, bytestring):
         return "{0}{1}".format(
             PyRosettaInitFileParserBase._prefix_binary,
-            self.encode_bytestring(file_handle.read()),
+            self.encode_bytestring(bytestring),
         )
 
-    def format_encode_string(self, file_handle):
+    def format_encode_string(self, string, parent_dir):
+        obj = self.encode(string, parent_dir)
         return "{0}{1}".format(
             PyRosettaInitFileParserBase._prefix_string,
-            self.encode_string(file_handle.read()),
+            self.encode_object(obj),
         )
+
+    def format_encode_substring(self, string):
+        return "{0}{1}".format(
+            PyRosettaInitFileParserBase._prefix_string,
+            self.encode_string(string),
+        )
+
+    def encode_subfile(self, file):
+        basename = os.path.basename(file)
+        if self.is_text_file(file):
+            with open(file, "r") as f:
+                result = {basename: self.format_encode_substring(f.read())}
+        else:
+            with open(file, "rb") as f:
+                result = {basename: self.format_encode_bytestring(f.read())}
+        return result
+
+    def encode(self, string, parent_dir):
+        results = []
+        for obj in filter(bool, re.split(r'(\s+)', string)):
+            supported_subfiles = {
+                obj,  # Full path to a subfile
+                os.path.join(parent_dir, obj),  # Subfile may be in the directory of the parent file
+            }
+            for file in supported_subfiles:
+                if os.path.isfile(file):
+                    result: dict = self.encode_subfile(file)  # Reserve `dict` object for a subfile
+                    break
+            else:  # Not a subfile
+                result: str = obj  # Reserve `str` object for text
+            results.append(result)
+
+        return results
 
     def encode_file(self, filename):
         results = {}
         if self.is_file_containing_list_of_files(filename):
-            result = {}
+            result = {}  # Reserve `dict` object for a file containing a list of files
             with open(filename, "r") as f1:
                 for line in f1.read().splitlines():
                     if self.is_text_file(line):
+                        parent_dir = os.path.dirname(line)
                         with open(line, "r") as f2:
-                            result[os.path.basename(line)] = self.format_encode_string(f2)
+                            result[os.path.basename(line)] = self.format_encode_string(f2.read(), parent_dir)
                     else:
                         with open(line, "rb") as f2:
-                            result[os.path.basename(line)] = self.format_encode_bytestring(f2)
-        elif self.is_text_file(filename):
-            with open(filename, "r") as f:
-                result = self.format_encode_string(f)
-        else:
-            with open(filename, "rb") as f:
-                result = self.format_encode_bytestring(f)
+                            result[os.path.basename(line)] = self.format_encode_bytestring(f2.read())
+        else:  # Reserve `str` object for a file
+            if self.is_text_file(filename):
+                parent_dir = os.path.dirname(line)
+                with open(filename, "r") as f:
+                    result = self.format_encode_string(f.read(), parent_dir)
+            else:
+                with open(filename, "rb") as f:
+                    result = self.format_encode_bytestring(f.read())
         results[os.path.basename(filename)] = result
         return results
 
@@ -249,7 +290,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         if kwargs["dry_run"] is None:
             kwargs["dry_run"] = False
         if not isinstance(kwargs["dry_run"], bool):
-            raise ValueError("The 'dry_run' keyword argument parameter must be a `bool` object.")
+            raise TypeError("The 'dry_run' keyword argument parameter must be a `bool` object.")
         if kwargs["output_dir"] is None:
             output_dir = os.path.join(os.getcwd(), "pyrosetta_init_files")
         elif isinstance(kwargs["output_dir"], str):
@@ -259,13 +300,13 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         if not os.path.isdir(output_dir):
             kwargs["output_dir"] = output_dir
         else:
-            raise IOError(
+            raise IsADirectoryError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
             )
         if kwargs["database"] is None:
             kwargs["database"] = pyrosetta._rosetta_database_from_env()
         if not (isinstance(kwargs["database"], str) and os.path.isdir(kwargs["database"])):
-            raise RuntimeError("PyRosetta database directory not found: {0}".format(kwargs["database"]))
+            raise NotADirectoryError("PyRosetta database directory not found: {0}".format(kwargs["database"]))
         fullargspec = inspect.getfullargspec(pyrosetta.init)
         default_init_kwargs = dict(zip(fullargspec.args, fullargspec.defaults))
         if kwargs["set_logging_handler"] is None:
@@ -298,6 +339,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         encoded_options_dict[self._database_option_name] = [self.kwargs["database"]]
         return encoded_options_dict
 
+    @property
+    def _malformed_init_file_error_msg(self):
+        return "Cannot read malformed initialization file: {0}".format(self.init_file)
+
     def decode_binary(self, string):
         return base64.b64decode(string, validate=True)
 
@@ -307,8 +352,37 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def format_decode_binary(self, value):
         return self.decode_binary(value.split(PyRosettaInitFileParserBase._prefix_binary)[-1])
 
-    def format_decode_string(self, value):
+    def format_decode_string(self, value, option_name):
+        obj = self.decode_string(value.split(PyRosettaInitFileParserBase._prefix_string)[-1])
+        return self.decode(obj, option_name)
+
+    def format_decode_substring(self, value):
         return self.decode_string(value.split(PyRosettaInitFileParserBase._prefix_string)[-1])
+
+    def decode(self, encoded_object, option_name):
+        file_content = ""
+        for obj in encoded_object:
+            if isinstance(obj, dict):  # a `dict` object is reserved for a subfile
+                assert len(obj) == 1, self._malformed_init_file_error_msg
+                basename, data = next(iter(obj.items()))
+                assert data.startswith(
+                    (PyRosettaInitFileParserBase._prefix_string, PyRosettaInitFileParserBase._prefix_binary)
+                ), self._malformed_init_file_error_msg
+                if data.startswith(PyRosettaInitFileParserBase._prefix_string):
+                    file_content = self.format_decode_substring(data)
+                    filename = self.write_text_file(option_name, basename, file_content)
+                elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
+                    file_content = self.format_decode_binary(data)
+                    filename = self.write_binary_file(option_name, basename, file_content)
+                result: str = filename
+            elif isinstance(obj, str):  # a `str` object is reserved for text
+                assert bool(obj), self._malformed_init_file_error_msg
+                result: str = obj
+            else:
+                raise ValueError(self._malformed_init_file_error_msg)
+            file_content += result
+
+        return file_content
 
     def setup_new_file(self, option_name, basename):
         file = os.path.join(self.kwargs["output_dir"], option_name.replace(":", "_"), str(self.file_counter), basename)
@@ -337,9 +411,9 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             for value in values:
                 if isinstance(value, dict):
                     for basename, data in value.items():
-                        if isinstance(data, str):
+                        if isinstance(data, str):  # a `str` object is reserved for a file
                             if data.startswith(PyRosettaInitFileParserBase._prefix_string):
-                                file_content = self.format_decode_string(data)
+                                file_content = self.format_decode_string(data, option_name)
                                 filename = self.write_text_file(option_name, basename, file_content)
                                 options_dict[option_name].append(filename)
                             elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
@@ -348,12 +422,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                                 options_dict[option_name].append(filename)
                             else:
                                 options_dict[option_name].append(data)
-                        elif isinstance(data, dict):
+                        elif isinstance(data, dict):  # a `dict` object is reserved for a file containing a list of files
                             file_list = []
                             for subbasename, subdata in data.items():
-                                assert isinstance(subdata, str), "Cannot read malformed initialization file: {0}".format(self.init_file)
+                                assert isinstance(subdata, str), self._malformed_init_file_error_msg
                                 if subdata.startswith(PyRosettaInitFileParserBase._prefix_string):
-                                    file_content = self.format_decode_string(subdata)
+                                    file_content = self.format_decode_string(subdata, option_name)
                                     filename = self.write_text_file(option_name, subbasename, file_content)
                                     file_list.append(filename)
                                 elif subdata.startswith(PyRosettaInitFileParserBase._prefix_binary):
@@ -366,7 +440,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 elif isinstance(value, str):
                     options_dict[option_name].append(value)
                 else:
-                    raise RuntimeError("Cannot read malformed initialization file: {0}".format(self.init_file))
+                    raise ValueError(self._malformed_init_file_error_msg)
         return options_dict
 
     def get_options(self):
