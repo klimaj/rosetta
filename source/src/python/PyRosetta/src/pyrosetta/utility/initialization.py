@@ -34,12 +34,31 @@ from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
 class PyRosettaInitFileParserBase(object):
     _database_option_name = "in:path:database"
     _init_file_extension = ".init"
-    _prefix_string = "[PyRosettaInitStringFile]"
+    _prefix_string = "[PyRosettaInitTextFile]"
     _prefix_binary = "[PyRosettaInitBinaryFile]"
     _strftime_format = "%Y-%m-%d-%H-%M-%S"
 
     def get_pyrosetta_build(self):
         return pyrosetta._version_string()
+
+    @property
+    def was_init_called(self):
+        return pyrosetta.rosetta.basic.was_init_called()
+
+    def validate_init_was_called(self):
+        if not self.was_init_called:
+            raise RuntimeError(
+                "PyRosetta must be already initialized to dump an initialization file. "
+                + "Please run `pyrosetta.init()` with custom options and try again."
+            )
+
+    def validate_init_was_not_called(self):
+        if self.was_init_called:
+            raise RuntimeError(
+                "PyRosetta must not be already initialized to initialize from a file. "
+                "Please ensure that `pyrosetta.init()` was not already called (e.g., "
+                "if using a Jupyter notebook, please restart the kernel) and try again."
+            )
 
 
 class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
@@ -47,6 +66,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         self.validate_init_was_called()
         self.kwargs = self.setup_kwargs(**kwargs)
         self.output_filename = self.setup_output_filename(output_filename)
+        self.cached_files = []
 
     def setup_output_filename(self, output_filename):
         if not isinstance(output_filename, str):
@@ -86,6 +106,12 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         elif not isinstance(kwargs["overwrite"], bool):
             raise TypeError(
                 "The 'overwrite' keyword argument parameter must be a `bool` object. Received: {1}".format(type(kwargs["overwrite"]))
+            )
+        if "dry_run" in kwargs and kwargs["dry_run"] is None:
+            kwargs["dry_run"] = False
+        elif not isinstance(kwargs["dry_run"], bool):
+            raise TypeError(
+                "The 'dry_run' keyword argument parameter must be a `bool` object. Received: {1}".format(type(kwargs["dry_run"]))
             )
         return kwargs
 
@@ -226,6 +252,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             }
             for file in supported_subfiles:
                 if os.path.isfile(file):
+                    self.cached_files.append(file)
                     result: dict = self.encode_subfile(file)  # Reserve `dict` object for a subfile
                     break
             else:  # Not a subfile
@@ -235,11 +262,13 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         return results
 
     def encode_file(self, filename):
+        self.cached_files.append(filename)
         results = {}
         if self.is_file_containing_list_of_files(filename):
             result = {}  # Reserve `dict` object for a file containing a list of files
             with open(filename, "r") as f1:
                 for line in f1.read().splitlines():
+                    self.cached_files.append(line)
                     if self.is_text_file(line):
                         parent_dir = os.path.dirname(line)
                         with open(line, "r") as f2:
@@ -249,7 +278,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                             result[os.path.basename(line)] = self.format_encode_bytestring(f2.read())
         else:  # Reserve `str` object for a file
             if self.is_text_file(filename):
-                parent_dir = os.path.dirname(line)
+                parent_dir = os.path.dirname(filename)
                 with open(filename, "r") as f:
                     result = self.format_encode_string(f.read(), parent_dir)
             else:
@@ -258,22 +287,28 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         results[os.path.basename(filename)] = result
         return results
 
-    def validate_init_was_called(self):
-        if not pyrosetta.rosetta.basic.was_init_called():
-            raise RuntimeError(
-                "PyRosetta must be already initialized to dump an initialization file. "
-                + "Please run `pyrosetta.init()` with custom options and try again."
-            )
+    def print_cached_files(self, dry_run):
+        if dry_run:
+            print(f"Dry run dump PyRosetta initialization '.init' file:")
+        else:
+            print(f"Dumping PyRosetta initialization '.init' file to: {self.output_filename}")
+        print("Parsed {0} PyRosetta initialization input files:".format(len(self.cached_files)))
+        for file in self.cached_files:
+            print(file)
+        if dry_run:
+            print(f"Skipping dumping PyRosetta initialization '.init' file...")
 
     def dump(self):
         encoded_options_dict = self.get_encoded_options_dict()
         encoded_options_dict.pop(self._database_option_name, None)
         overwrite = self.kwargs.pop("overwrite")
+        dry_run = self.kwargs.pop("dry_run")
         data_dict = {
             **self.kwargs,
             "options": encoded_options_dict,
         }
-        if (not os.path.isfile(self.output_filename)) or overwrite:
+        self.print_cached_files(dry_run)
+        if not dry_run and ((not os.path.isfile(self.output_filename)) or overwrite):
             with open(self.output_filename, "w") as f:
                 json.dump(data_dict, f, indent=4)
 
@@ -326,14 +361,6 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 "Please provide a valid input PyRosetta '.init' file. Received: {0}".format(init_file)
             )
 
-    def validate_init_was_not_called(self):
-        if pyrosetta.rosetta.basic.was_init_called():
-            raise RuntimeError(
-                "PyRosetta must not be already initialized to initialize from a file. "
-                "Please ensure that `pyrosetta.init()` was not already called (e.g., "
-                "if using a Jupyter notebook, please restart the kernel) and try again."
-            )
-
     def get_encoded_options_dict(self):
         encoded_options_dict = self.init_dict["options"]
         encoded_options_dict[self._database_option_name] = [self.kwargs["database"]]
@@ -369,12 +396,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                     (PyRosettaInitFileParserBase._prefix_string, PyRosettaInitFileParserBase._prefix_binary)
                 ), self._malformed_init_file_error_msg
                 if data.startswith(PyRosettaInitFileParserBase._prefix_string):
-                    file_content = self.format_decode_substring(data)
-                    filename = self.write_text_file(option_name, basename, file_content)
+                    subfile_content = self.format_decode_substring(data)
+                    subfilename = self.write_text_file(option_name, basename, subfile_content)
                 elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
-                    file_content = self.format_decode_binary(data)
-                    filename = self.write_binary_file(option_name, basename, file_content)
-                result: str = filename
+                    subfile_content = self.format_decode_binary(data)
+                    subfilename = self.write_binary_file(option_name, basename, subfile_content)
+                result: str = subfilename
             elif isinstance(obj, str):  # a `str` object is reserved for text
                 assert bool(obj), self._malformed_init_file_error_msg
                 result: str = obj
@@ -639,6 +666,7 @@ class PyRosettaInitFileParser(object):
         license=None,
         metadata=None,
         overwrite=None,
+        dry_run=False,
     ):
         """
         Write a PyRosetta initialization '.init' file.
@@ -664,6 +692,9 @@ class PyRosettaInitFileParser(object):
             overwrite: An optional `bool` object specifying whether or not to overwrite the output '.init' file if it exists.
                 If `False`, then raise an error if the output '.init' file already exists.
                 Default: False
+            dry_run: An optional `bool` object specifying whether or not to dump the output '.init' file. If `True`, then only print
+                the files that would be compressed into the '.init' file if it were `False`.
+                Default: False
         """
         return PyRosettaInitFileWriter(
             output_filename,
@@ -672,6 +703,7 @@ class PyRosettaInitFileParser(object):
             license=license,
             metadata=metadata,
             overwrite=overwrite,
+            dry_run=dry_run,
         ).dump()
 
     @staticmethod
@@ -702,12 +734,15 @@ class PyRosettaInitFileParser(object):
                 license=None,
                 metadata=None,
                 overwrite=False,
+                dry_run=False,
             )
         if compressed:
             if as_dict:
                 return writer.get_encoded_options_dict()
             else:
-                raise ValueError("Cannot flatten compressed PyRosetta initialization options into a `str` object.")
+                raise NotImplementedError(
+                    "Formatting compressed PyRosetta initialization options into a `str` object is not supported."
+                )
         else:
             if as_dict:
                 return writer.get_options_dict()

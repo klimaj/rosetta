@@ -10,10 +10,40 @@ __author__ = "Jason C. Klima"
 
 
 import argparse
+import glob
 import json
 import os
 import pyrosetta
+import sys
 
+sys.path.insert(0, os.path.dirname(__file__))
+try:
+    from write_test_files import DATABASE_FILES
+except ImportError as ex:
+    raise ImportError(ex)
+
+
+def get_mode(filename):
+    return "rb" if filename.endswith(".gz") else "r"
+
+def filter_pdb_rotamers_line(string):
+    return os.linesep.join(filter(lambda x: not x.startswith("PDB_ROTAMERS"), string.splitlines()))
+
+def get_pdb_rotamers_file(string, parent_dir=None):
+    for line in reversed(string.splitlines()):
+        if line.startswith("PDB_ROTAMERS"):
+            entry = line.split("PDB_ROTAMERS ")[-1].strip()
+            if parent_dir is not None and os.path.isfile(os.path.join(parent_dir, entry)):
+                file = os.path.join(parent_dir, entry)
+                break
+            elif os.path.isfile(entry):
+                file = entry
+                break
+            else:
+                raise FileNotFoundError(entry)
+    else:
+        file = None
+    return file
 
 def main(tmp_dir):
     init_file = os.path.join(tmp_dir, "my.init")
@@ -28,7 +58,7 @@ def main(tmp_dir):
     assert isinstance(init_options, dict)
     assert "in:path:database" in init_options
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_options_from_init_file`"
-    print("Dry run PyRosetta initialization options from '.init' file:", init_options, sep=os.linesep)
+    print("Dry run PyRosetta initialization from '.init' file options as `dict`:", init_options, sep=os.linesep)
 
     init_options = pyrosetta.get_options_from_init_file(
         init_file,
@@ -40,7 +70,7 @@ def main(tmp_dir):
     assert isinstance(init_options, str)
     assert "-in:path:database" in init_options
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_options_from_init_file`"
-    print("Dry run, flattened PyRosetta initialization options from '.init' file:", init_options, sep=os.linesep)
+    print("Dry run PyRosetta initialization from '.init' file options as `str`:", init_options, sep=os.linesep)
 
     tmp_init_dir = os.path.join(tmp_dir, "tmp1_pyrosetta_init_files")
     init_options = pyrosetta.get_options_from_init_file(
@@ -54,7 +84,7 @@ def main(tmp_dir):
     assert "in:path:database" in init_options
     assert os.listdir(tmp_init_dir) != []
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_options_from_init_file`"
-    print("PyRosetta initialization options from '.init' file:", init_options, sep=os.linesep)
+    print("PyRosetta initialization from '.init' file options as `dict`:", init_options, sep=os.linesep)
 
     tmp_init_dir = os.path.join(tmp_dir, "tmp2_pyrosetta_init_files")
     init_options = pyrosetta.get_options_from_init_file(
@@ -68,7 +98,7 @@ def main(tmp_dir):
     assert "-in:path:database" in init_options
     assert os.listdir(tmp_init_dir) != []
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_options_from_init_file`"
-    print("Flattened PyRosetta initialization options from '.init' file:", init_options, sep=os.linesep)
+    print("PyRosetta initialization from '.init' file options as `str`:", init_options, sep=os.linesep)
 
 
     init_dir = os.path.join(tmp_dir, "pyrosetta_init_files")
@@ -82,6 +112,7 @@ def main(tmp_dir):
         silent=False,
     )
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `dry_run=True`"
+
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
@@ -109,6 +140,64 @@ def main(tmp_dir):
     with open(os.path.join(tmp_dir, "res_types.json"), "r") as f:
         original_name3_set = set(json.load(f))
     assert name3_set == original_name3_set, "Residue type sets are not identical."
+
+    def print_identical_files(file1, file2, relpath=tmp_dir):
+        print(
+            "Files are identical:",
+            f"'./{os.path.relpath(file1, start=relpath)}'",
+            "==",
+            f"'./{os.path.relpath(file2, start=relpath)}'",
+        )
+
+    file_counter = 0
+    input_files = list(filter(os.path.isfile, glob.glob(os.path.join(init_dir, "**", "*"), recursive=True)))
+    for input_file in input_files:
+        if os.path.basename(input_file).startswith("tmp_"):
+            original_file = os.path.join(tmp_dir, os.path.basename(input_file))
+            assert os.path.isfile(original_file), f"Original file does not exist: {original_file}"
+            mode = get_mode(input_file)
+            with open(original_file, mode) as f1, open(input_file, mode) as f2:
+                assert f1.read() == f2.read(), f"{original_file} != {input_file}"
+                file_counter += 1
+                print_identical_files(original_file, input_file)
+        elif os.path.basename(input_file).endswith(".list"):
+            original_file = os.path.join(tmp_dir, os.path.basename(input_file))
+            assert os.path.isfile(original_file), f"Original file does not exist: {original_file}"
+            with open(original_file, "r") as f1, open(input_file, "r") as f2:
+                l1, l2 = f1.read().splitlines(), f2.read().splitlines()
+                list_file_counter = 0
+                assert len(l1) == len(l2), "List files do not contain an identical number of lines."
+                for i in range(len(l1)):
+                    original_listed_file, input_listed_file = l1[i], l2[i]
+                    mode1, mode2 = get_mode(original_listed_file), get_mode(input_listed_file)
+                    assert mode1 == mode2, f"File types are not identical: {original_listed_file} {input_listed_file}"
+                    with open(original_listed_file, mode1) as f3, open(input_listed_file, mode2) as f4:
+                        assert f3.read() == f4.read(), f"{original_listed_file} != {input_listed_file}"
+                        print_identical_files(original_listed_file, input_listed_file)
+                        file_counter += 1
+                        list_file_counter += 1
+                assert list_file_counter == len(l1) == len(l2), "List files are not identical."
+                file_counter += 1
+                print_identical_files(original_file, input_file)
+        else:
+            for database_file in filter(lambda f: f.endswith((".params", ".txt")), DATABASE_FILES):
+                if os.path.basename(database_file) == os.path.basename(input_file):
+                    original_file = os.path.join(tmp_dir, os.path.basename(database_file))
+                    assert os.path.isfile(original_file), f"Original file does not exist: {original_file}"
+                    with open(original_file, "r") as f1, open(input_file, "r") as f2:
+                        s1, s2 = f1.read(), f2.read()
+                        assert filter_pdb_rotamers_line(s1) == filter_pdb_rotamers_line(s2), f"{database_file} != {input_file}"
+                        print_identical_files(original_file, input_file)
+                        file_counter += 1
+                        original_pdb_rotamers_file = get_pdb_rotamers_file(s1, parent_dir=tmp_dir)
+                        input_pdb_rotamers_file = get_pdb_rotamers_file(s2, parent_dir=None)
+                        if all(x is not None for x in (original_pdb_rotamers_file, input_pdb_rotamers_file)):
+                            with open(original_pdb_rotamers_file, "r") as f3, open(input_pdb_rotamers_file, "r") as f4:
+                                assert f3.read() == f4.read(), f"{original_pdb_rotamers_file} != {input_pdb_rotamers_file}"
+                                print_identical_files(original_pdb_rotamers_file, input_pdb_rotamers_file)
+                                file_counter += 1
+    print(f"Successfully tested that {file_counter}/{len(input_files)} cached files are identical to their originals.")
+
 
 if __name__ == "__main__":
     print("Running: {0}".format(__file__))
