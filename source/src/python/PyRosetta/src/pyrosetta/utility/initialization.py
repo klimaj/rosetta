@@ -145,7 +145,6 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def apply_protocol_settings_metric(self, pose):
         xml_obj = self.get_protocol_settings_metric()
         xml_obj.apply(pose)
-
         return pose
 
     def get_protocol_settings_dict(self, pose):
@@ -175,7 +174,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                 if os.path.isfile(value):
                     encoded_options_dict[option_name].append(self.encode_file(value))
                 elif os.path.isdir(value):
-                    rel_value = os.path.relpath(value, start=os.curdir)
+                    rel_value = os.path.relpath(value, start=os.curdir) if os.path.isabs(value) else value
                     if value != rel_value and option_name != self._database_option_name:
                         warnings.warn(
                             "The option '-{0}' with path '{1}' is being cached as the relative path: '{2}'.".format(
@@ -189,18 +188,10 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                     encoded_options_dict[option_name].append(value)
         return encoded_options_dict
 
-    def is_file_containing_list_of_files(self, filename):
-        try:
-            with open(filename, "r") as f:
-                for line in f:
-                    return os.path.isfile(line.strip())
-        except UnicodeDecodeError:
-            return False
-
     def is_text_file(self, filename):
         try:
             with open(filename, "r") as f:
-                for line in f:
+                for _line in f:
                     return True
         except UnicodeDecodeError:
             return False
@@ -281,10 +272,11 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             print(f"Dumping PyRosetta initialization '.init' file to: {self.output_filename}")
         if len(self.cached_files) > 0:
             print("Compressed {0} PyRosetta initialization input files:".format(len(self.cached_files)))
+            for file in self.cached_files:
+                print(os.path.relpath(file, start=os.curdir))
         else:
             print("No PyRosetta initialization input files to compress.")
-        for file in self.cached_files:
-            print(file)
+
         if dry_run:
             print(f"Skipping dumping PyRosetta initialization '.init' file...")
 
@@ -301,6 +293,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         if not dry_run and ((not os.path.isfile(self.output_filename)) or overwrite):
             with open(self.output_filename, "w") as f:
                 json.dump(data_dict, f, indent=4)
+            print("Dumped PyRosetta '.init' file size:", round(os.path.getsize(self.output_filename) * 1e-6, 3), "MB")
 
 
 class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
@@ -328,6 +321,10 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             raise IsADirectoryError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
             )
+        if kwargs["relative_paths"] is None:
+            kwargs["relative_paths"] = False
+        if not isinstance(kwargs["relative_paths"], bool):
+            raise TypeError("The 'relative_paths' keyword argument parameter must be a `bool` object.")
         if kwargs["database"] is None:
             kwargs["database"] = pyrosetta._rosetta_database_from_env()
         if not (isinstance(kwargs["database"], str) and os.path.isdir(kwargs["database"])):
@@ -403,6 +400,8 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
 
     def setup_new_file(self, option_name, basename):
         file = os.path.join(self.kwargs["output_dir"], option_name.replace(":", "_"), str(self.file_counter), basename)
+        if self.kwargs["relative_paths"]:
+            file = os.path.relpath(file, start=os.curdir)
         self.file_counter += 1
         if not self.kwargs["dry_run"]:
             os.makedirs(os.path.dirname(file), exist_ok=False)
@@ -536,6 +535,7 @@ class PyRosettaInitFileParser(object):
         init_file,
         dry_run=None,
         output_dir=None,
+        relative_paths=None,
         database=None,
         set_logging_handler=None,
         notebook=None,
@@ -558,6 +558,9 @@ class PyRosettaInitFileParser(object):
                 Default: False
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
+            relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
+                (with respect to the current working directory) of the files written to the 'output_dir' keyword argument parameter.
+                Default: False
             database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
@@ -576,6 +579,7 @@ class PyRosettaInitFileParser(object):
             init_file,
             dry_run=dry_run,
             output_dir=output_dir,
+            relative_paths=relative_paths,
             database=database,
             set_logging_handler=set_logging_handler,
             notebook=notebook,
@@ -587,6 +591,7 @@ class PyRosettaInitFileParser(object):
         init_file,
         dry_run=True,
         output_dir=None,
+        relative_paths=None,
         database=None,
         as_dict=False,
     ):
@@ -609,6 +614,9 @@ class PyRosettaInitFileParser(object):
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files if
                 the 'dry_run' keyword argument is `False`.
                 Default: `./pyrosetta_init_files`
+            relative_paths: An optional `bool` object specifying whether or not to return the relative paths (with respect to
+                the current working directory) of the files written to the 'output_dir' keyword argument parameter.
+                Default: False
             database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
@@ -623,6 +631,7 @@ class PyRosettaInitFileParser(object):
             init_file,
             dry_run=dry_run,
             output_dir=output_dir,
+            relative_paths=relative_paths,
             database=database,
             set_logging_handler=None,
             notebook=None,

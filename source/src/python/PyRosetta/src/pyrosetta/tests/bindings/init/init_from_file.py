@@ -46,37 +46,41 @@ def get_pdb_rotamers_file(string, parent_dir=None):
     return file
 
 def main(tmp_dir):
+    os.chdir(tmp_dir)
     init_file = os.path.join(tmp_dir, "my.init")
 
     init_options = pyrosetta.get_init_options_from_file(
         init_file,
         dry_run=True,
         output_dir=None,
+        relative_paths=False,
         database=None,
         as_dict=True,
     )
     assert isinstance(init_options, dict)
     assert "in:path:database" in init_options
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_init_options_from_file`"
-    print("Dry run PyRosetta initialization from '.init' file options as `dict`:", init_options, sep=os.linesep)
+    print("Dry run PyRosetta initialization from '.init' file options with absolute paths as `dict`:", init_options, sep=os.linesep)
 
     init_options = pyrosetta.get_init_options_from_file(
         init_file,
         dry_run=True,
         output_dir=None,
+        relative_paths=True,
         database=None,
         as_dict=False,
     )
     assert isinstance(init_options, str)
     assert "-in:path:database" in init_options
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_init_options_from_file`"
-    print("Dry run PyRosetta initialization from '.init' file options as `str`:", init_options, sep=os.linesep)
+    print("Dry run PyRosetta initialization from '.init' file options with relative paths as `str`:", init_options, sep=os.linesep)
 
     tmp_init_dir = os.path.join(tmp_dir, "tmp1_pyrosetta_init_files")
     init_options = pyrosetta.get_init_options_from_file(
         init_file,
         dry_run=False,
         output_dir=tmp_init_dir,
+        relative_paths=True,
         database=None,
         as_dict=True,
     )
@@ -84,13 +88,14 @@ def main(tmp_dir):
     assert "in:path:database" in init_options
     assert os.listdir(tmp_init_dir) != []
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_init_options_from_file`"
-    print("PyRosetta initialization from '.init' file options as `dict`:", init_options, sep=os.linesep)
+    print("PyRosetta initialization from '.init' file options with relative paths as `dict`:", init_options, sep=os.linesep)
 
     tmp_init_dir = os.path.join(tmp_dir, "tmp2_pyrosetta_init_files")
     init_options = pyrosetta.get_init_options_from_file(
         init_file,
         dry_run=False,
         output_dir=tmp_init_dir,
+        relative_paths=None,
         database=None,
         as_dict=False,
     )
@@ -98,13 +103,14 @@ def main(tmp_dir):
     assert "-in:path:database" in init_options
     assert os.listdir(tmp_init_dir) != []
     assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `pyrosetta.get_init_options_from_file`"
-    print("PyRosetta initialization from '.init' file options as `str`:", init_options, sep=os.linesep)
+    print("PyRosetta initialization from '.init' file options with absolute paths as `str`:", init_options, sep=os.linesep)
 
 
     init_dir = os.path.join(tmp_dir, "pyrosetta_init_files")
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        relative_paths=True,
         dry_run=True,
         database=None,
         set_logging_handler=None,
@@ -116,6 +122,7 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        relative_paths=False,
         dry_run=True,
         database=os.path.relpath(pyrosetta._rosetta_database_from_env()),
         set_logging_handler=None,
@@ -127,6 +134,7 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        relative_paths=True,
         dry_run=False,
         database=None,
         set_logging_handler=None,

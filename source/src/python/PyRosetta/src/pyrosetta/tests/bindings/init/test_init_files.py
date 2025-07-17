@@ -18,7 +18,7 @@ import unittest
 
 class InitFromFileTest(unittest.TestCase):
     def test_pipeline(self):
-        tmp_dir = tempfile.TemporaryDirectory()
+        tmp_dir = tempfile.TemporaryDirectory(dir=os.getcwd(), suffix="_my_work_dir")
         cwd = os.path.dirname(__file__)
         test_scripts = [
             os.path.join(cwd, "write_test_files.py"),

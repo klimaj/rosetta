@@ -39,6 +39,7 @@ def truncate_init_options(init_options):
     return trunc_init_options
 
 def main(tmp_dir):
+    os.chdir(tmp_dir)
     pdb_files = glob.glob(os.path.join(tmp_dir, "tmp_*.pdb")) + glob.glob(os.path.join(tmp_dir, "tmp_*.pdb.gz"))
     assert len(pdb_files) > 0, "PDB files do not exist."
     list_file = os.path.join(tmp_dir, "my_file.list")
@@ -73,21 +74,20 @@ def main(tmp_dir):
     else:
         raise RuntimeError("PyRosetta is already initialized.")
 
-    init_options = pyrosetta.get_init_options(compressed=True, as_dict=True)
-    assert isinstance(init_options, dict)
-    assert "in:path:database" in init_options.keys()
-    print("Compressed PyRosetta initialization options as `dict`:")
-    print(truncate_init_options(init_options))
+    init_options = pyrosetta.get_init_options(compressed=False, as_dict=False)
+    assert isinstance(init_options, str)
+    assert "-in:path:database" in init_options
+    print("Uncompressed PyRosetta initialization options as `str`:", init_options, sep=os.linesep)
 
     init_options = pyrosetta.get_init_options(compressed=False, as_dict=True)
     assert isinstance(init_options, dict)
     assert "in:path:database" in init_options.keys()
-    print("Decompressed PyRosetta initialization options as `dict`:", init_options, sep=os.linesep)
+    print("Uncompressed PyRosetta initialization options as `dict`:", init_options, sep=os.linesep)
 
-    init_options = pyrosetta.get_init_options(compressed=False, as_dict=False)
-    assert isinstance(init_options, str)
-    assert "-in:path:database" in init_options
-    print("Decompressed PyRosetta initialization options as `str`:", init_options, sep=os.linesep)
+    init_options = pyrosetta.get_init_options(compressed=True, as_dict=True)
+    assert isinstance(init_options, dict)
+    assert "in:path:database" in init_options.keys()
+    print("Compressed PyRosetta initialization options as `dict`:", truncate_init_options(init_options), sep=os.linesep)
 
     try:
         pyrosetta.get_init_options(compressed=True, as_dict=False)
@@ -96,7 +96,7 @@ def main(tmp_dir):
         ex = e
     finally:
         if ex is None:
-            raise RuntimeError(f"Did not catch `ValueError`.")
+            raise RuntimeError(f"Did not catch `NotImplementedError`.")
         else:
             print(f"Successfully caught `{type(ex).__name__}: {ex}`")
 
@@ -125,13 +125,13 @@ def main(tmp_dir):
         overwrite=False,
         dry_run=False,
     )
-    print("PyRosetta '.init' file size:", round(os.path.getsize(init_file) * 1e-6, 3), "MB")
 
     pose = pyrosetta.Pose()
     base_res_set = pose.conformation().modifiable_residue_type_set_for_conf().base_residue_types()
     name3_set = set(base_res_set.pop().name3() for _ in range(base_res_set.capacity()))
     with open(os.path.join(tmp_dir, "res_types.json"), "w") as f:
         json.dump(list(name3_set), f)
+
 
 if __name__ == "__main__":
     print("Running: {0}".format(__file__))

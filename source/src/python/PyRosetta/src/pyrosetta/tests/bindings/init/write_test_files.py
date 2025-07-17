@@ -49,6 +49,7 @@ TER
 
 
 def main(tmp_dir):
+    os.chdir(tmp_dir)
     if not pyrosetta.rosetta.basic.was_init_called():
         pyrosetta.init(
             options="-run:constant_seed 1 -ex2",
