@@ -558,8 +558,8 @@ class PyRosettaInitFileParser(object):
                 Default: False
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
-            database: An optional `str` object representing the path to the PyRosetta database. By default, the PyRosetta database
-                is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the PyRosetta database path
+            database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
+                is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
                 Default: None
             set_logging_handler: An optional object passed to `pyrosetta.init(set_logging_handler=...)` during PyRosetta initialization.
@@ -583,7 +583,7 @@ class PyRosettaInitFileParser(object):
         ).init()
 
     @staticmethod
-    def get_options_from_init_file(
+    def get_init_options_from_file(
         init_file,
         dry_run=True,
         output_dir=None,
@@ -609,8 +609,8 @@ class PyRosettaInitFileParser(object):
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files if
                 the 'dry_run' keyword argument is `False`.
                 Default: `./pyrosetta_init_files`
-            database: An optional `str` object representing the path to the PyRosetta database. By default, the PyRosetta database
-                is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the PyRosetta database path
+            database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
+                is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
                 Default: None
             as_dict: An optional `bool` object specifying whether or not to return the PyRosetta initialization options as a `dict`
@@ -688,7 +688,7 @@ class PyRosettaInitFileParser(object):
     def get_init_options(compressed=False, as_dict=False):
         """
         Get the currently initialized PyRosetta initialization options. This method uses the `ProtocolSettingsMetric` SimpleMetric
-        to get the Rosetta command line options (including the PyRosetta database).
+        to get the Rosetta command line options (including the Rosetta database).
 
         **kwargs:
             compressed: An optional `bool` object specifying whether or not to compress any input files (including files containing
