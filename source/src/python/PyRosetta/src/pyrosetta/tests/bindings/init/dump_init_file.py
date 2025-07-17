@@ -47,6 +47,8 @@ def main(tmp_dir):
     assert len(extra_res_fa_files) > 0, "Extra residue files do not exist."
     patch_files = glob.glob(os.path.join(tmp_dir, "*.txt"))
     assert len(patch_files) > 0, "Patch files do not exist."
+    bcl_dir = os.path.join(tmp_dir, "bcl_rosetta")
+    os.makedirs(bcl_dir, exist_ok=False)
     if not pyrosetta.rosetta.basic.was_init_called():
         pyrosetta.init(
             options=(
@@ -62,7 +64,7 @@ def main(tmp_dir):
                 " ".join(extra_res_fa_files[:-1]),
                 extra_res_fa_files[-1],
                 " ".join(patch_files),
-                tmp_dir,
+                bcl_dir,
             ),
             set_logging_handler="logging",
             notebook=None,
