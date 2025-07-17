@@ -292,7 +292,10 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             print(f"Dry run dump PyRosetta initialization '.init' file:")
         else:
             print(f"Dumping PyRosetta initialization '.init' file to: {self.output_filename}")
-        print("Parsed {0} PyRosetta initialization input files:".format(len(self.cached_files)))
+        if len(self.cached_files) > 0:
+            print("Compressed {0} PyRosetta initialization input files:".format(len(self.cached_files)))
+        else:
+            print("No PyRosetta initialization input files to compress.")
         for file in self.cached_files:
             print(file)
         if dry_run:
@@ -498,17 +501,17 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def print_results(self):
         if not self.kwargs["silent"]:
             if self.kwargs["dry_run"]:
-                print(
-                    "Dry run PyRosetta initialization from file: {0}".format(self.init_file),
-                    "Parsed {0} PyRosetta initialization input files.".format(self.file_counter),
-                    sep=os.linesep,
-                )
+                print("Dry run PyRosetta initialization from file: {0}".format(self.init_file))
+                if self.file_counter == 0:
+                    print("No PyRosetta initialization input files to decompress.")
+                else:
+                    print("Decompressed {0} PyRosetta initialization input files.".format(self.file_counter))
             else:
                 print("Initializing PyRosetta from file: {0}".format(self.init_file))
                 if self.file_counter == 0:
-                    print("Parsed {0} PyRosetta initialization input files.".format(self.file_counter))
+                    print("No PyRosetta initialization input files to decompress.")
                 else:
-                    print("Parsed {0} PyRosetta initialization input files written to: {1}".format(
+                    print("Decompressed {0} PyRosetta initialization input files written to: {1}".format(
                             self.file_counter, self.kwargs["output_dir"]
                         )
                     )

@@ -287,7 +287,7 @@ class IO(Generic[G]):
 
     def _write_init_file(self, filename: str) -> None:
         """Write compressed PyRosetta initialization input files to the input filename."""
-        if filename != "" and not self.dry_run:
+        if filename != "":
             try:
                 dump_init_file(
                     filename,
@@ -300,6 +300,7 @@ class IO(Generic[G]):
                         ),
                     ],
                     overwrite=True,
+                    dry_run=self.dry_run,
                 )
                 logging.debug("Successfully ran `pyrosetta.dump_init_file` on the host node.")
             except BaseException as ex:
