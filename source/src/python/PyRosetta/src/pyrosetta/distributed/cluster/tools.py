@@ -508,10 +508,11 @@ def reproduce(
                 + "before running `reproduce()` with the 'input_packed_pose' keyword argument "
                 + "and then use `None` for the 'init_file' keyword argument parameter."
             )
-        _tmp_dir = tempfile.TemporaryDirectory()
+        _tmp_dir = tempfile.TemporaryDirectory(prefix="PyRosettaCluster_reproduce_")
         init_from_file(
             init_file,
             output_dir=os.path.join(_tmp_dir.name, "pyrosetta_init_files"),
+            relative_paths=False,
             dry_run=False,
             database=None,
             set_logging_handler="logging",
