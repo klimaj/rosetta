@@ -123,6 +123,8 @@ def main(tmp_dir):
         overwrite=False,
         dry_run=False,
     )
+    print("PyRosetta '.init' file size:", round(os.path.getsize(init_file) * 1e-6, 3), "MB")
+
     pose = pyrosetta.Pose()
     base_res_set = pose.conformation().modifiable_residue_type_set_for_conf().base_residue_types()
     name3_set = set(base_res_set.pop().name3() for _ in range(base_res_set.capacity()))
