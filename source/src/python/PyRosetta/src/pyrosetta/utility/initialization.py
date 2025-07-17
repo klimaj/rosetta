@@ -264,26 +264,13 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def encode_file(self, filename):
         self.cached_files.append(filename)
         results = {}
-        if self.is_file_containing_list_of_files(filename):
-            result = {}  # Reserve `dict` object for a file containing a list of files
-            with open(filename, "r") as f1:
-                for line in f1.read().splitlines():
-                    self.cached_files.append(line)
-                    if self.is_text_file(line):
-                        parent_dir = os.path.dirname(line)
-                        with open(line, "r") as f2:
-                            result[os.path.basename(line)] = self.format_encode_string(f2.read(), parent_dir)
-                    else:
-                        with open(line, "rb") as f2:
-                            result[os.path.basename(line)] = self.format_encode_bytestring(f2.read())
-        else:  # Reserve `str` object for a file
-            if self.is_text_file(filename):
-                parent_dir = os.path.dirname(filename)
-                with open(filename, "r") as f:
-                    result = self.format_encode_string(f.read(), parent_dir)
-            else:
-                with open(filename, "rb") as f:
-                    result = self.format_encode_bytestring(f.read())
+        if self.is_text_file(filename):
+            parent_dir = os.path.dirname(filename)
+            with open(filename, "r") as f:
+                result = self.format_encode_string(f.read(), parent_dir)
+        else:
+            with open(filename, "rb") as f:
+                result = self.format_encode_bytestring(f.read())
         results[os.path.basename(filename)] = result
         return results
 
@@ -441,32 +428,17 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             for value in values:
                 if isinstance(value, dict):
                     for basename, data in value.items():
-                        if isinstance(data, str):  # a `str` object is reserved for a file
-                            if data.startswith(PyRosettaInitFileParserBase._prefix_string):
-                                file_content = self.format_decode_string(data, option_name)
-                                filename = self.write_text_file(option_name, basename, file_content)
-                                options_dict[option_name].append(filename)
-                            elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
-                                file_content = self.format_decode_binary(data)
-                                filename = self.write_binary_file(option_name, basename, file_content)
-                                options_dict[option_name].append(filename)
-                            else:
-                                options_dict[option_name].append(data)
-                        elif isinstance(data, dict):  # a `dict` object is reserved for a file containing a list of files
-                            file_list = []
-                            for subbasename, subdata in data.items():
-                                assert isinstance(subdata, str), self._malformed_init_file_error_msg
-                                if subdata.startswith(PyRosettaInitFileParserBase._prefix_string):
-                                    file_content = self.format_decode_string(subdata, option_name)
-                                    filename = self.write_text_file(option_name, subbasename, file_content)
-                                    file_list.append(filename)
-                                elif subdata.startswith(PyRosettaInitFileParserBase._prefix_binary):
-                                    file_content = self.format_decode_binary(subdata)
-                                    filename = self.write_binary_file(option_name, subbasename, file_content)
-                                    file_list.append(filename)
-                            file_content = os.linesep.join(file_list) + os.linesep
+                        assert isinstance(data, str), self._malformed_init_file_error_msg
+                        if data.startswith(PyRosettaInitFileParserBase._prefix_string):
+                            file_content = self.format_decode_string(data, option_name)
                             filename = self.write_text_file(option_name, basename, file_content)
                             options_dict[option_name].append(filename)
+                        elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
+                            file_content = self.format_decode_binary(data)
+                            filename = self.write_binary_file(option_name, basename, file_content)
+                            options_dict[option_name].append(filename)
+                        else:
+                            options_dict[option_name].append(data)
                 elif isinstance(value, str):
                     options_dict[option_name].append(value)
                 else:
