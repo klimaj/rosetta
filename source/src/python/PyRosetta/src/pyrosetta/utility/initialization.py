@@ -550,9 +550,9 @@ class PyRosettaInitFileParser(object):
         before committing to writing all files to disk and running PyRosetta initialization.
 
         Args:
-            init_file: a required `str` object representing the input '.init' file.
+            init_file: A required `str` object representing the input '.init' file.
 
-        **kwargs:
+        Keyword Args:
             dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files and perform PyRosetta
                 initialization. If `True`, then only print the PyRosetta initialization options that would be run if it were `False`.
                 Default: False
@@ -574,6 +574,9 @@ class PyRosettaInitFileParser(object):
             silent: An optional object passed to `pyrosetta.init(silent=...)` during PyRosetta initialization.
                 If `None`, then the default `pyrosetta.init` keyword argument parameter is used.
                 Default: None
+
+        Returns:
+            None
         """
         return PyRosettaInitFileReader(
             init_file,
@@ -604,9 +607,9 @@ class PyRosettaInitFileParser(object):
         input files into an output directory given by the 'output_dir' keyword argument without running `pyrosetta.init`.
 
         Args:
-            init_file: a required `str` object representing the input '.init' file.
+            init_file: A required `str` object representing the input '.init' file.
 
-        **kwargs:
+        Keyword Args:
             dry_run: An optional `bool` object specifying whether or not to write PyRosetta initialization input files to disk.
                 If `True`, then the PyRosetta initialization input files will not be written to disk so the returned options
                 can be inspected (or input manually into `pyrosetta.init` if options do not contain input files).
@@ -624,6 +627,12 @@ class PyRosettaInitFileParser(object):
             as_dict: An optional `bool` object specifying whether or not to return the PyRosetta initialization options as a `dict`
                 object, otherwise options are returned as a `str` object.
                 Default: False
+
+        Raises:
+            ValueError when the 'as_dict' keyword argument parameter is not a `bool` object.
+
+        Returns:
+            A `str` or `dict` object representing the PyRosetta initialization options.
         """
         if not isinstance(as_dict, bool):
             raise ValueError(f"The 'as_dict' keyword argument parameter must be a `bool` object. Received: {type(as_dict)}")
@@ -665,9 +674,9 @@ class PyRosettaInitFileParser(object):
         are correct. Note that automatic detection of input files containing any spaces (e.g., ' ') in file paths or filenames is not supported.
 
         Args:
-            output_filename: a required `str` object representing the output '.init' file.
+            output_filename: A required `str` object representing the output '.init' file.
 
-        **kwargs:
+        Keyword Args:
             author: An optional `str` object representing the author's/authors' name(s) or username(s).
                 Default: None
             email: An optional `str` object representing the author's/authors' email address(es).
@@ -682,6 +691,9 @@ class PyRosettaInitFileParser(object):
             dry_run: An optional `bool` object specifying whether or not to dump the output '.init' file. If `True`, then only print
                 the files that would be compressed into the '.init' file if it were `False`.
                 Default: False
+
+        Returns:
+            None
         """
         return PyRosettaInitFileWriter(
             output_filename,
@@ -699,7 +711,7 @@ class PyRosettaInitFileParser(object):
         Get the currently initialized PyRosetta initialization options. This method uses the `ProtocolSettingsMetric` SimpleMetric
         to get the Rosetta command line options (including the Rosetta database).
 
-        **kwargs:
+        Keyword Args:
             compressed: An optional `bool` object specifying whether or not to compress any input files (including files containing
                 lists of files) in memory, and return only the relative paths of any input directories (from the current working
                 directory) in the Rosetta command line options (e.g., '-in:path:bcl /path/to/current/directory/bcl_rosetta' is
@@ -708,6 +720,13 @@ class PyRosettaInitFileParser(object):
             as_dict: An optional `bool` object specifying whether or not to return the PyRosetta initialization options as a `dict`
                 object, otherwise options are returned as a `str` object.
                 Default: False
+
+        Raises:
+            ValueError when the 'compressed' or 'as_dict' keyword argument parameters are not `bool` objects.
+            NotImplementedError when `compressed=True` and `as_dict=False`.
+
+        Returns:
+            A `str` or `dict` object representing the PyRosetta initialization options.
         """
         if not isinstance(compressed, bool):
             raise ValueError(f"The 'compressed' keyword argument parameter must be a `bool` object. Received: {type(compressed)}")

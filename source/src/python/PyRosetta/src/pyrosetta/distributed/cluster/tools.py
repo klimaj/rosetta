@@ -526,7 +526,7 @@ def reproduce(
             "If providing a '.pose' or '.pose.bz2' file to the 'input_file' keyword argument parameter, "
             + "please also provide the '.init' file from the original simulation to the 'init_file' "
             + "keyword argument parameter, otherwise ensure `pyrosetta.init` or `pyrosetta.init_from_file` "
-            + "has been properly called before running `reproduce()`."
+            + "has been properly called before running `reproduce`."
         )
     PyRosettaCluster(
         **toolz.dicttoolz.keyfilter(
