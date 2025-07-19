@@ -41,6 +41,22 @@ class PyRosettaInitFileParserBase(object):
     def get_pyrosetta_build(self):
         return pyrosetta._version_string()
 
+    def pyrosetta_build_warning(self):
+        original_pyrosetta_build = self.init_dict["pyrosetta_build"]
+        current_pyrosetta_build = self.get_pyrosetta_build()
+        if original_pyrosetta_build != current_pyrosetta_build:
+            _msg = os.linesep.join(
+                [
+                    "The PyRosetta version that generated the initialization file "
+                    + "does not match the current PyRosetta version. Please inspect "
+                    + "the input initialization files if you encounter any issues during "
+                    + "or after PyRosetta initialization: {0}".format(self.kwargs["output_dir"]),
+                    "Original: {0}".format(original_pyrosetta_build),
+                    "Current:  {0}".format(current_pyrosetta_build),
+                ]
+            )
+            warnings.warn(_msg, UserWarning, stacklevel=2)
+
     @property
     def was_init_called(self):
         return pyrosetta.rosetta.basic.was_init_called()
@@ -137,11 +153,11 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             base_name_only="0"
             get_user_options="1"
             get_script_vars="1"
-            skip_corrections="0"/>
+            skip_corrections="1"/>
         </SIMPLE_METRICS>
         """.format(__class__.__name__)
         ).get_simple_metric("protocol_settings")
-    
+
     def apply_protocol_settings_metric(self, pose):
         xml_obj = self.get_protocol_settings_metric()
         xml_obj.apply(pose)
@@ -155,13 +171,20 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def get_options_dict(self):
         pose = self.init_pose()
         pose = self.apply_protocol_settings_metric(pose)
-        return self.get_protocol_settings_dict(pose)
+        options_dict = {}
+        for option_name, string in self.get_protocol_settings_dict(pose).items():
+            values = string.split()
+            if option_name == self._database_option_name:
+                options_dict[option_name] = sorted(set(values), key=values.index)
+            else:
+                options_dict[option_name] = values
+        return options_dict
 
     def get_options_str(self):
         options_dict = self.get_options_dict()
         return " ".join(
             [
-                "-{0} {1}".format(option_name, values)
+                "-{0} {1}".format(option_name, " ".join(values))
                 for option_name, values in options_dict.items()
             ]
         )
@@ -170,7 +193,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         options_dict = self.get_options_dict()
         encoded_options_dict = collections.defaultdict(list)
         for option_name, values in options_dict.items():
-            for value in values.split():
+            for value in values:
                 if os.path.isfile(value):
                     encoded_options_dict[option_name].append(self.encode_file(value))
                 elif os.path.isdir(value):
@@ -186,7 +209,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
                     encoded_options_dict[option_name].append(rel_value)
                 else:
                     encoded_options_dict[option_name].append(value)
-        return encoded_options_dict
+        return dict(encoded_options_dict)
 
     def is_text_file(self, filename):
         try:
@@ -298,7 +321,6 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
 
 class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def __init__(self, init_file, **kwargs):
-        self.validate_init_was_not_called()
         self.init_file = init_file
         self.init_dict = self.setup_init_dict(init_file)
         self.kwargs = self.setup_kwargs(**kwargs)
@@ -317,6 +339,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             raise TypeError("The 'output_dir' keyword argument parameter must be a `str` object.")
         if not os.path.isdir(output_dir):
             kwargs["output_dir"] = output_dir
+        elif kwargs["dry_run"]:
+            warnings.warn(
+                "The output directory already exists! Please remove the output directory before disabling dry run: {0}".format(output_dir),
+                UserWarning,
+                stacklevel=2,
+            )
         else:
             raise IsADirectoryError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
@@ -442,7 +470,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                     options_dict[option_name].append(value)
                 else:
                     raise ValueError(self._malformed_init_file_error_msg)
-        return options_dict
+        return dict(options_dict)
 
     def get_options(self):
         options_dict = self.get_options_dict()
@@ -452,22 +480,6 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 for option_name, values in options_dict.items()
             ]
         )
-
-    def pyrosetta_build_warning(self):
-        original_pyrosetta_build = self.init_dict["pyrosetta_build"]
-        current_pyrosetta_build = self.get_pyrosetta_build()
-        if original_pyrosetta_build != current_pyrosetta_build:
-            _msg = os.linesep.join(
-                [
-                    "The PyRosetta version that generated the initialization file "
-                    + "does not match the current PyRosetta version. Please inspect "
-                    + "the input initialization files if you encounter any issues during "
-                    + "or after PyRosetta initialization: {0}".format(self.kwargs["output_dir"]),
-                    "Original: {0}".format(original_pyrosetta_build),
-                    "Current:  {0}".format(current_pyrosetta_build),
-                ]
-            )
-            warnings.warn(_msg, UserWarning, stacklevel=2)
 
     def print_results(self):
         if not self.kwargs["silent"]:
@@ -514,6 +526,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 print("Running PyRosetta initialization...")
 
     def init(self):
+        self.validate_init_was_not_called()
         options = self.get_options()
         self.print_results()
         self.pyrosetta_build_warning()

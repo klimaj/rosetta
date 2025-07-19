@@ -206,6 +206,28 @@ def main(tmp_dir):
                                 file_counter += 1
     print(f"Successfully tested that {file_counter}/{len(input_files)} cached files are identical to their originals.")
 
+    init_dir_original = os.path.join(tmp_dir, "pyrosetta_init_files")
+    init_options_original = pyrosetta.get_init_options_from_file(
+        init_file,
+        dry_run=True,
+        output_dir=init_dir_original,
+        relative_paths=True,
+        database=None,
+        as_dict=True,
+    )
+    init_options_reproduce = pyrosetta.get_init_options(compressed=False, as_dict=True)
+    for option_name, original_values in init_options_original.items():
+        reproduce_values = init_options_reproduce[option_name]
+        assert len(reproduce_values) == len(original_values), f"{reproduce_values} != {original_values}"
+        for i in range(len(original_values)):
+            original_value, reproduce_value = original_values[i], reproduce_values[i]
+            if all(map(os.path.isdir, (original_value, reproduce_value))):
+                original_value_rel, reproduce_value_rel = map(os.path.relpath, (original_value, reproduce_value))
+                assert reproduce_value_rel == original_value_rel, f"{reproduce_value_rel} != {original_value_rel}"
+            else:
+                assert reproduce_value == original_value, f"{reproduce_value} != {original_value}"
+    print(f"Successfully tested that original '.init' file options and reproduced PyRosetta initialization options are identical.")
+
 
 if __name__ == "__main__":
     print("Running: {0}".format(__file__))
