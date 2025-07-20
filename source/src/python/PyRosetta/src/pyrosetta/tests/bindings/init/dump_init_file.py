@@ -57,7 +57,8 @@ def main(tmp_dir):
                 "-run:jran 1234567 "
                 "-override_database_params 1 "
                 "-load_PDB_components 0 "
-                "-out:levels core.init:0 basic.random.init_random_generator:0"
+                "-out:levels core.init:0 basic.random.init_random_generator:0 "
+                "-parser:script_vars foo=bar baz=12.34"
             ),
             extra_options="-s {0} -l {1} -extra_res_fa {2} -extra_res_fa {3} -extra_patch_fa {4} -bcl {5}".format(
                 " ".join(pdb_files),

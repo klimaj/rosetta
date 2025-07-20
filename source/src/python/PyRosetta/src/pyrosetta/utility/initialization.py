@@ -152,8 +152,8 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             custom_type="{0}"
             base_name_only="0"
             get_user_options="1"
-            get_script_vars="1"
-            skip_corrections="1"/>
+            get_script_vars="0"
+            skip_corrections="0"/>
         </SIMPLE_METRICS>
         """.format(__class__.__name__)
         ).get_simple_metric("protocol_settings")
