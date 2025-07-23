@@ -110,6 +110,7 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        skip_corrections=True,
         relative_paths=True,
         dry_run=True,
         database=None,
@@ -122,6 +123,7 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        skip_corrections=False,
         relative_paths=False,
         dry_run=True,
         database=os.path.relpath(pyrosetta._rosetta_database_from_env()),
@@ -134,6 +136,7 @@ def main(tmp_dir):
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
+        skip_corrections=None,
         relative_paths=True,
         dry_run=False,
         database=None,

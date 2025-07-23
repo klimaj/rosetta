@@ -41,21 +41,18 @@ class PyRosettaInitFileParserBase(object):
     def get_pyrosetta_build(self):
         return pyrosetta._version_string()
 
-    def pyrosetta_build_warning(self):
-        original_pyrosetta_build = self.init_dict["pyrosetta_build"]
-        current_pyrosetta_build = self.get_pyrosetta_build()
-        if original_pyrosetta_build != current_pyrosetta_build:
-            _msg = os.linesep.join(
-                [
-                    "The PyRosetta version that generated the initialization file "
-                    + "does not match the current PyRosetta version. Please inspect "
-                    + "the input initialization files if you encounter any issues during "
-                    + "or after PyRosetta initialization: {0}".format(self.kwargs["output_dir"]),
-                    "Original: {0}".format(original_pyrosetta_build),
-                    "Current:  {0}".format(current_pyrosetta_build),
-                ]
-            )
-            warnings.warn(_msg, UserWarning, stacklevel=2)
+    def pyrosetta_build_warning(self, original_pyrosetta_build, current_pyrosetta_build):
+        _msg = os.linesep.join(
+            [
+                "The PyRosetta version that generated the initialization file "
+                + "does not match the current PyRosetta version. Please inspect "
+                + "the input initialization files if you encounter any issues during "
+                + "or after PyRosetta initialization: {0}".format(self.kwargs["output_dir"]),
+                "Original: {0}".format(original_pyrosetta_build),
+                "Current:  {0}".format(current_pyrosetta_build),
+            ]
+        )
+        warnings.warn(_msg, UserWarning, stacklevel=2)
 
     @property
     def was_init_called(self):
@@ -349,6 +346,8 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
             raise IsADirectoryError(
                 "The output directory already exists! Please remove the output directory and try again: {0}".format(output_dir)
             )
+        if not isinstance(kwargs["skip_corrections"], (bool, type(None))):
+            raise TypeError("The 'skip_corrections' keyword argument parameter must be a `bool` or `NoneType` object.")
         if kwargs["relative_paths"] is None:
             kwargs["relative_paths"] = False
         if not isinstance(kwargs["relative_paths"], bool):
@@ -452,6 +451,8 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         encoded_options_dict = self.get_encoded_options_dict()
         options_dict = collections.defaultdict(list)
         for option_name, values in encoded_options_dict.items():
+            if self.kwargs["skip_corrections"] and option_name.startswith("corrections:"):
+                continue
             for value in values:
                 if isinstance(value, dict):
                     for basename, data in value.items():
@@ -527,9 +528,17 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
 
     def init(self):
         self.validate_init_was_not_called()
+        original_pyrosetta_build = self.init_dict["pyrosetta_build"]
+        current_pyrosetta_build = self.get_pyrosetta_build()
+        if original_pyrosetta_build != current_pyrosetta_build:
+            self.pyrosetta_build_warning(original_pyrosetta_build, current_pyrosetta_build)
+            if self.kwargs["skip_corrections"] is None:
+                self.kwargs["skip_corrections"] = False
+        else:
+            if self.kwargs["skip_corrections"] is None:
+                self.kwargs["skip_corrections"] = True
         options = self.get_options()
         self.print_results()
-        self.pyrosetta_build_warning()
         pyrosetta_init_kwargs = dict(
             options=options,
             extra_options="",
@@ -548,6 +557,7 @@ class PyRosettaInitFileParser(object):
         init_file,
         dry_run=None,
         output_dir=None,
+        skip_corrections=None,
         relative_paths=None,
         database=None,
         set_logging_handler=None,
@@ -571,6 +581,11 @@ class PyRosettaInitFileParser(object):
                 Default: False
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
+            skip_corrections: An optional `bool` object specifying whether or not to skip ScoreFunction corrections in the input
+                'init_file' argumenter parameter, which are set in-code upon PyRosetta initiailization. If a `NoneType` object is
+                provided, then ScoreFunction corrections are automatically enabled if the PyRosetta build from the '.init' file
+                does not match the current PyRosetta build.
+                Default: None
             relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
                 (with respect to the current working directory) of the files written to the 'output_dir' keyword argument parameter.
                 Default: False
@@ -595,6 +610,7 @@ class PyRosettaInitFileParser(object):
             init_file,
             dry_run=dry_run,
             output_dir=output_dir,
+            skip_corrections=skip_corrections,
             relative_paths=relative_paths,
             database=database,
             set_logging_handler=set_logging_handler,
@@ -653,6 +669,7 @@ class PyRosettaInitFileParser(object):
             init_file,
             dry_run=dry_run,
             output_dir=output_dir,
+            skip_corrections=False,
             relative_paths=relative_paths,
             database=database,
             set_logging_handler=None,

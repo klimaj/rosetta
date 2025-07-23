@@ -512,6 +512,7 @@ def reproduce(
         init_from_file(
             init_file,
             output_dir=os.path.join(_tmp_dir.name, "pyrosetta_init_files"),
+            skip_corrections=False,
             relative_paths=False,
             dry_run=False,
             database=None,
