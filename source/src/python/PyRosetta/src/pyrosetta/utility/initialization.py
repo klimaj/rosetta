@@ -33,6 +33,7 @@ from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
 
 class PyRosettaInitFileParserBase(object):
     _database_option_name = "in:path:database"
+    _corrections_option_name = "corrections:"
     _init_file_extension = ".init"
     _prefix_string = "[PyRosettaInitTextFile]"
     _prefix_binary = "[PyRosettaInitBinaryFile]"
@@ -451,7 +452,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
         encoded_options_dict = self.get_encoded_options_dict()
         options_dict = collections.defaultdict(list)
         for option_name, values in encoded_options_dict.items():
-            if self.kwargs["skip_corrections"] and option_name.startswith("corrections:"):
+            if self.kwargs["skip_corrections"] and option_name.startswith(self._corrections_option_name):
                 continue
             for value in values:
                 if isinstance(value, dict):
@@ -581,10 +582,10 @@ class PyRosettaInitFileParser(object):
                 Default: False
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
-            skip_corrections: An optional `bool` object specifying whether or not to skip ScoreFunction corrections in the input
-                'init_file' argumenter parameter, which are set in-code upon PyRosetta initiailization. If a `NoneType` object is
-                provided, then ScoreFunction corrections are automatically enabled if the PyRosetta build from the '.init' file
-                does not match the current PyRosetta build.
+            skip_corrections: An optional `bool` object specifying whether or not to skip any ScoreFunction corrections specified
+                in the input 'init_file' argumenter parameter, which are set in-code upon PyRosetta initiailization. If a `NoneType`
+                object is provided, then the input ScoreFunction corrections are automatically used for PyRosetta initiailization
+                if the PyRosetta version from the '.init' file does not match the current PyRosetta version.
                 Default: None
             relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
                 (with respect to the current working directory) of the files written to the 'output_dir' keyword argument parameter.
