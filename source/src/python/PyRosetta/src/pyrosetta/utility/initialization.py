@@ -27,8 +27,7 @@ import tempfile
 import warnings
 
 from pprint import pprint
-from pyrosetta.rosetta.core.simple_metrics import get_sm_data
-from pyrosetta.rosetta.protocols.rosetta_scripts import XmlObjects
+from pyrosetta.rosetta.core.simple_metrics.composite_metrics import ProtocolSettingsMetric
 
 
 class PyRosettaInitFileParserBase(object):
@@ -141,36 +140,32 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
     def init_pose(self):
         return pyrosetta.Pose()
 
-    def get_protocol_settings_metric(self):
-        return XmlObjects().create_from_string(
-        """
-        <SIMPLE_METRICS>
-        <ProtocolSettingsMetric
-            name="protocol_settings"
-            custom_type="{0}"
-            base_name_only="0"
-            get_user_options="1"
-            get_script_vars="0"
-            skip_corrections="0"/>
-        </SIMPLE_METRICS>
-        """.format(__class__.__name__)
-        ).get_simple_metric("protocol_settings")
+    def get_protocol_settings_metric(
+        self,
+        base_name_option_only=False,
+        get_script_vars=False,
+        get_user_options=True,
+        skip_corrections=False,
+    ):
+        metric = ProtocolSettingsMetric()
+        options = pyrosetta.rosetta.basic.options.process()
+        metric.parse_options(
+            options=options,
+            base_name_option_only=base_name_option_only,
+            get_script_vars=get_script_vars,
+            get_user_options=get_user_options,
+            skip_corrections=skip_corrections,
+        )
+        return metric
 
-    def apply_protocol_settings_metric(self, pose):
-        xml_obj = self.get_protocol_settings_metric()
-        xml_obj.apply(pose)
-        return pose
-
-    def get_protocol_settings_dict(self, pose):
-        sm_data = get_sm_data(pose)
-        data = dict(sm_data.get_composite_string_metric_data())
-        return dict(data["{0}_opt".format(__class__.__name__)])
+    def get_protocol_settings_dict(self):
+        pose = self.init_pose()
+        metric = self.get_protocol_settings_metric()
+        return dict(metric.calculate(pose))
 
     def get_options_dict(self):
-        pose = self.init_pose()
-        pose = self.apply_protocol_settings_metric(pose)
         options_dict = {}
-        for option_name, string in self.get_protocol_settings_dict(pose).items():
+        for option_name, string in self.get_protocol_settings_dict().items():
             values = string.split()
             if option_name == self._database_option_name:
                 options_dict[option_name] = sorted(set(values), key=values.index)
