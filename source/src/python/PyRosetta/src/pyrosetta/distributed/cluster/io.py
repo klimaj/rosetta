@@ -189,6 +189,7 @@ class IO(Generic[G]):
             if not k.startswith("PyRosettaCluster_"):
                 kwargs.pop(k, None)
         kwargs.pop(self.protocols_key, None)
+        kwargs.pop("PyRosettaCluster_seed", None)
         kwargs.pop("PyRosettaCluster_protocol_number", None)
         kwargs.pop("PyRosettaCluster_protocol_name", None)
         kwargs.pop("PyRosettaCluster_output_path", None)
