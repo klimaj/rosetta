@@ -20,11 +20,11 @@ import datetime
 import inspect
 import json
 import os
-import pickle
 import pyrosetta
 import re
 import tempfile
 import warnings
+import zlib
 
 from pprint import pprint
 from pyrosetta.rosetta.core.simple_metrics.composite_metrics import ProtocolSettingsMetric
@@ -34,8 +34,6 @@ class PyRosettaInitFileParserBase(object):
     _database_option_name = "in:path:database"
     _corrections_option_name = "corrections:"
     _init_file_extension = ".init"
-    _prefix_string = "[PyRosettaInitTextFile]"
-    _prefix_binary = "[PyRosettaInitBinaryFile]"
     _strftime_format = "%Y-%m-%d-%H-%M-%S"
 
     def get_pyrosetta_build(self):
@@ -74,7 +72,88 @@ class PyRosettaInitFileParserBase(object):
             )
 
 
-class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
+class PyRosettaInitFileSerializer(object):
+    _compression_level = 9
+    _encoding = "utf-8"
+    _prefix_string = "[PyRosettaInitTextFile]"
+    _prefix_binary = "[PyRosettaInitBinaryFile]"
+    _tag_str = b"Txt"
+    _tag_obj = b"Obj"
+
+    def dump_json(self, obj):
+        return json.dumps(
+            obj,
+            skipkeys=False,
+            ensure_ascii=False,
+            check_circular=True,
+            allow_nan=False,
+            cls=None,
+            indent=None,
+            separators=(",", ":"),
+            default=None,
+            sort_keys=False,
+        )
+
+    def load_json(self, string):
+        return json.loads(
+            string,
+            cls=None,
+            object_hook=None,
+            object_pairs_hook=None,
+            parse_int=None,
+            parse_constant=None,
+        )
+
+    def join_tag(self, tag, raw):
+        return tag + raw
+
+    def split_tag(self, obj):
+        for t in (PyRosettaInitFileSerializer._tag_str, PyRosettaInitFileSerializer._tag_obj):
+            if obj.startswith(t):
+                tag, raw = obj[:len(t)], obj[len(t):]
+                break
+        else:
+            ValueError(obj)
+
+        return tag, raw
+
+    def encode_bytestring(self, bytestring):
+        return base64.b64encode(bytestring).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
+
+    def encode_string(self, string):
+        if isinstance(string, str):
+            tag = PyRosettaInitFileSerializer._tag_str
+            raw = string
+        elif isinstance(string, (list, dict)):
+            tag = PyRosettaInitFileSerializer._tag_obj
+            raw = self.dump_json(string)
+        else:
+            raise TypeError(string)
+        compressed = zlib.compress(
+            raw.encode(PyRosettaInitFileSerializer._encoding),
+            PyRosettaInitFileSerializer._compression_level,
+        )
+
+        return self.encode_bytestring(self.join_tag(tag, compressed))
+
+    def decode_binary(self, string):
+        return base64.b64decode(string, validate=True)
+
+    def decode_string(self, bytestring):
+        obj = self.decode_binary(bytestring)
+        tag, raw = self.split_tag(obj)
+        decompressed = zlib.decompress(raw).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
+        if tag == PyRosettaInitFileSerializer._tag_str:
+            result = decompressed
+        elif tag == PyRosettaInitFileSerializer._tag_obj:
+            result = self.load_json(decompressed)
+        else:
+            raise ValueError(tag)
+
+        return result
+
+
+class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSerializer):
     def __init__(self, output_filename, **kwargs):
         self.validate_init_was_called()
         self.kwargs = self.setup_kwargs(**kwargs)
@@ -212,31 +291,25 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
         except UnicodeDecodeError:
             return False
 
-    def encode_bytestring(self, bytestring):
-        return base64.b64encode(bytestring).decode()
-
-    def encode_string(self, string):
-        return self.encode_bytestring(pickle.dumps(string))
-
     def encode_object(self, obj):
         return self.encode_string(obj)
 
     def format_encode_bytestring(self, bytestring):
         return "{0}{1}".format(
-            PyRosettaInitFileParserBase._prefix_binary,
+            PyRosettaInitFileSerializer._prefix_binary,
             self.encode_bytestring(bytestring),
         )
 
     def format_encode_string(self, string, parent_dir):
         obj = self.encode(string, parent_dir)
         return "{0}{1}".format(
-            PyRosettaInitFileParserBase._prefix_string,
+            PyRosettaInitFileSerializer._prefix_string,
             self.encode_object(obj),
         )
 
     def format_encode_substring(self, string):
         return "{0}{1}".format(
-            PyRosettaInitFileParserBase._prefix_string,
+            PyRosettaInitFileSerializer._prefix_string,
             self.encode_string(string),
         )
 
@@ -312,7 +385,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase):
             print("Dumped PyRosetta '.init' file size:", round(os.path.getsize(self.output_filename) * 1e-6, 3), "MB")
 
 
-class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
+class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSerializer):
     def __init__(self, init_file, **kwargs):
         self.init_file = init_file
         self.init_dict = self.setup_init_dict(init_file)
@@ -380,21 +453,15 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
     def _malformed_init_file_error_msg(self):
         return "Cannot read malformed initialization file: {0}".format(self.init_file)
 
-    def decode_binary(self, string):
-        return base64.b64decode(string, validate=True)
-
-    def decode_string(self, bytestring):
-        return pickle.loads(self.decode_binary(bytestring))
-
     def format_decode_binary(self, value):
-        return self.decode_binary(value.split(PyRosettaInitFileParserBase._prefix_binary)[-1])
+        return self.decode_binary(value.split(PyRosettaInitFileSerializer._prefix_binary)[-1])
 
     def format_decode_string(self, value, option_name):
-        obj = self.decode_string(value.split(PyRosettaInitFileParserBase._prefix_string)[-1])
+        obj = self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1])
         return self.decode(obj, option_name)
 
     def format_decode_substring(self, value):
-        return self.decode_string(value.split(PyRosettaInitFileParserBase._prefix_string)[-1])
+        return self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1])
 
     def decode(self, encoded_object, option_name):
         file_content = ""
@@ -403,12 +470,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 assert len(obj) == 1, self._malformed_init_file_error_msg
                 basename, data = next(iter(obj.items()))
                 assert data.startswith(
-                    (PyRosettaInitFileParserBase._prefix_string, PyRosettaInitFileParserBase._prefix_binary)
+                    (PyRosettaInitFileSerializer._prefix_string, PyRosettaInitFileSerializer._prefix_binary)
                 ), self._malformed_init_file_error_msg
-                if data.startswith(PyRosettaInitFileParserBase._prefix_string):
+                if data.startswith(PyRosettaInitFileSerializer._prefix_string):
                     subfile_content = self.format_decode_substring(data)
                     subfilename = self.write_text_file(option_name, basename, subfile_content)
-                elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
+                elif data.startswith(PyRosettaInitFileSerializer._prefix_binary):
                     subfile_content = self.format_decode_binary(data)
                     subfilename = self.write_binary_file(option_name, basename, subfile_content)
                 result: str = subfilename
@@ -453,11 +520,11 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase):
                 if isinstance(value, dict):
                     for basename, data in value.items():
                         assert isinstance(data, str), self._malformed_init_file_error_msg
-                        if data.startswith(PyRosettaInitFileParserBase._prefix_string):
+                        if data.startswith(PyRosettaInitFileSerializer._prefix_string):
                             file_content = self.format_decode_string(data, option_name)
                             filename = self.write_text_file(option_name, basename, file_content)
                             options_dict[option_name].append(filename)
-                        elif data.startswith(PyRosettaInitFileParserBase._prefix_binary):
+                        elif data.startswith(PyRosettaInitFileSerializer._prefix_binary):
                             file_content = self.format_decode_binary(data)
                             filename = self.write_binary_file(option_name, basename, file_content)
                             options_dict[option_name].append(filename)
