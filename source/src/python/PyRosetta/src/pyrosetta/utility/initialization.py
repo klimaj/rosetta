@@ -195,6 +195,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                     self._init_file_extension, output_filename
                 )
             )
+
         return output_filename
 
     def setup_kwargs(self, **kwargs):
@@ -225,6 +226,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             raise TypeError(
                 "The 'dry_run' keyword argument parameter must be a `bool` object. Received: {1}".format(type(kwargs["dry_run"]))
             )
+
         return kwargs
 
     def assert_metadata_json_serializable(self, data):
@@ -255,11 +257,13 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             get_user_options=get_user_options,
             skip_corrections=skip_corrections,
         )
+
         return metric
 
     def get_protocol_settings_dict(self):
         pose = self.init_pose()
         metric = self.get_protocol_settings_metric()
+
         return dict(metric.calculate(pose))
 
     def get_options_dict(self):
@@ -270,10 +274,12 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                 options_dict[option_name] = sorted(set(values), key=values.index)
             else:
                 options_dict[option_name] = values
+
         return options_dict
 
     def get_options_str(self):
         options_dict = self.get_options_dict()
+
         return " ".join(
             [
                 "-{0} {1}".format(option_name, " ".join(values))
@@ -301,6 +307,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                     encoded_options_dict[option_name].append(rel_value)
                 else:
                     encoded_options_dict[option_name].append(value)
+
         return dict(encoded_options_dict)
 
     def is_text_file(self, filename):
@@ -322,6 +329,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
 
     def format_encode_string(self, string, parent_dir):
         obj = self.encode(string, parent_dir)
+
         return "{0}{1}".format(
             PyRosettaInitFileSerializer._prefix_string,
             self.encode_object(obj),
@@ -341,6 +349,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
         else:
             with open(file, "rb") as f:
                 result = {basename: self.format_encode_bytestring(f.read())}
+
         return result
 
     def encode(self, string, parent_dir):
@@ -372,6 +381,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             with open(filename, "rb") as f:
                 result = self.format_encode_bytestring(f.read())
         results[os.path.basename(filename)] = result
+
         return results
 
     def print_cached_files(self, dry_run):
@@ -385,7 +395,6 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                 print(os.path.relpath(file, start=os.curdir))
         else:
             print("No PyRosetta initialization input files to compress.")
-
         if dry_run:
             print(f"Skipping dumping PyRosetta initialization '.init' file...")
 
@@ -459,6 +468,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             kwargs["notebook"] = default_init_kwargs["notebook"]
         if kwargs["silent"] is None:
             kwargs["silent"] = default_init_kwargs["silent"]
+
         return kwargs
 
     def setup_init_dict(self, init_file):
@@ -473,6 +483,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
     def get_encoded_options_dict(self):
         encoded_options_dict = self.init_dict["options"]
         encoded_options_dict[self._database_option_name] = [self.kwargs["database"]]
+
         return encoded_options_dict
 
     @property
@@ -484,6 +495,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
 
     def format_decode_string(self, value, option_name):
         obj = self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1], self.kwargs["max_decompressed_bytes"])
+
         return self.decode(obj, option_name)
 
     def format_decode_substring(self, value):
@@ -521,6 +533,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
         self.file_counter += 1
         if not self.kwargs["dry_run"]:
             os.makedirs(os.path.dirname(file), exist_ok=False)
+
         return file
 
     def write_file(self, option_name, basename, file_content, mode="w"):
@@ -528,6 +541,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
         if not self.kwargs["dry_run"]:
             with open(new_file, mode) as f:
                 f.write(file_content)
+
         return new_file
 
     def write_text_file(self, *args):
@@ -560,10 +574,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                     options_dict[option_name].append(value)
                 else:
                     raise ValueError(self._malformed_init_file_error_msg)
+
         return dict(options_dict)
 
     def get_options(self):
         options_dict = self.get_options_dict()
+
         return " ".join(
             [
                 "-{0} {1}".format(option_name, " ".join(values))
