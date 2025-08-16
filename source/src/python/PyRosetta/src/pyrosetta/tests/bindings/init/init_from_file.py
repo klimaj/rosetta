@@ -54,6 +54,7 @@ def main(tmp_dir):
         dry_run=True,
         output_dir=None,
         relative_paths=False,
+        max_decompressed_bytes=None,
         database=None,
         as_dict=True,
     )
@@ -67,6 +68,7 @@ def main(tmp_dir):
         dry_run=True,
         output_dir=None,
         relative_paths=True,
+        max_decompressed_bytes=1_000_000_000,
         database=None,
         as_dict=False,
     )
@@ -81,6 +83,7 @@ def main(tmp_dir):
         dry_run=False,
         output_dir=tmp_init_dir,
         relative_paths=True,
+        max_decompressed_bytes=10_000_000,
         database=None,
         as_dict=True,
     )
@@ -96,6 +99,7 @@ def main(tmp_dir):
         dry_run=False,
         output_dir=tmp_init_dir,
         relative_paths=None,
+        max_decompressed_bytes=1_000_000,
         database=None,
         as_dict=False,
     )
@@ -107,11 +111,31 @@ def main(tmp_dir):
 
 
     init_dir = os.path.join(tmp_dir, "pyrosetta_init_files")
+    try:
+        pyrosetta.init_from_file(
+            init_file,
+            output_dir=init_dir,
+            skip_corrections=True,
+            relative_paths=True,
+            max_decompressed_bytes=1_000, # Testing 1 KB decompressed buffer size limit
+            dry_run=True,
+            database=None,
+            set_logging_handler=None,
+            notebook=None,
+            silent=False,
+        )
+        raise RuntimeError("`pyrosetta.init_from_file` did not raise `BufferError` with `max_decompressed_bytes=1_000`.")
+    except BufferError as ex:
+        print(f"Successfully caught `BufferError` with `max_decompressed_bytes=1_000`: {type(ex).__name__}: {ex}")
+    finally:
+        assert not pyrosetta.rosetta.basic.was_init_called(), "PyRosetta was initialized with `dry_run=True`"
+
     pyrosetta.init_from_file(
         init_file,
         output_dir=init_dir,
         skip_corrections=True,
         relative_paths=True,
+        max_decompressed_bytes=800_000,
         dry_run=True,
         database=None,
         set_logging_handler=None,
@@ -125,6 +149,7 @@ def main(tmp_dir):
         output_dir=init_dir,
         skip_corrections=False,
         relative_paths=False,
+        max_decompressed_bytes=800_000,
         dry_run=True,
         database=os.path.relpath(pyrosetta._rosetta_database_from_env()),
         set_logging_handler=None,
@@ -138,6 +163,7 @@ def main(tmp_dir):
         output_dir=init_dir,
         skip_corrections=None,
         relative_paths=True,
+        max_decompressed_bytes=800_000,
         dry_run=False,
         database=None,
         set_logging_handler=None,
@@ -215,6 +241,7 @@ def main(tmp_dir):
         dry_run=True,
         output_dir=init_dir_original,
         relative_paths=True,
+        max_decompressed_bytes=800_000,
         database=None,
         as_dict=True,
     )

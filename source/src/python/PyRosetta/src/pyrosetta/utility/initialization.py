@@ -73,6 +73,7 @@ class PyRosettaInitFileParserBase(object):
 
 
 class PyRosettaInitFileSerializer(object):
+    _chunk_size = 64 * 1024 # bytes
     _compression_level = 9
     _encoding = "utf-8"
     _prefix_string = "[PyRosettaInitTextFile]"
@@ -139,10 +140,12 @@ class PyRosettaInitFileSerializer(object):
     def decode_binary(self, string):
         return base64.b64decode(string, validate=True)
 
-    def decode_string(self, bytestring):
+    def decode_string(self, bytestring, max_decompressed_bytes):
         obj = self.decode_binary(bytestring)
         tag, raw = self.split_tag(obj)
-        decompressed = self.zlib_decompress(raw).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
+        decompressed = self.zlib_decompress(
+            raw, max_decompressed_bytes
+        ).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
         if tag == PyRosettaInitFileSerializer._tag_str:
             result = decompressed
         elif tag == PyRosettaInitFileSerializer._tag_obj:
@@ -152,22 +155,22 @@ class PyRosettaInitFileSerializer(object):
 
         return result
 
-    def zlib_decompress(self, data, max_size=200_000_000, chunk_size=(64 * 1024)):
+    def zlib_decompress(self, data, max_decompressed_bytes):
         buf = memoryview(data)
         zobj = zlib.decompressobj()
         arr = bytearray()
-        for i in range(0, len(buf), chunk_size):
-            arr += zobj.decompress(buf[i: i + chunk_size])
-            if len(arr) > max_size:
-                raise BufferError(self.get_zlib_decompress_err_msg(arr, max_size))
+        for i in range(0, len(buf), PyRosettaInitFileSerializer._chunk_size):
+            arr += zobj.decompress(buf[i: (i + PyRosettaInitFileSerializer._chunk_size)])
+            if len(arr) > max_decompressed_bytes:
+                raise BufferError(self.get_zlib_decompress_err_msg(arr, max_decompressed_bytes))
         arr += zobj.flush()
-        if len(arr) > max_size:
-            raise BufferError(self.get_zlib_decompress_err_msg(arr, max_size))
+        if len(arr) > max_decompressed_bytes:
+            raise BufferError(self.get_zlib_decompress_err_msg(arr, max_decompressed_bytes))
 
         return bytes(arr)
 
-    def get_zlib_decompress_err_msg(self, arr, max_size):
-        return "Decompressed data exceeds maximim size limit: {0} > {1}".format(len(arr), max_size)
+    def get_zlib_decompress_err_msg(self, arr, max_decompressed_bytes):
+        return "Decompressed data exceeds maximum bytes size limit: {0} > {1}".format(len(arr), max_decompressed_bytes)
 
 
 class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSerializer):
@@ -398,7 +401,7 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
         self.print_cached_files(dry_run)
         if not dry_run and ((not os.path.isfile(self.output_filename)) or overwrite):
             with open(self.output_filename, "w") as f:
-                json.dump(data_dict, f, indent=4)
+                json.dump(data_dict, f, indent=2)
             print("Dumped PyRosetta '.init' file size:", round(os.path.getsize(self.output_filename) * 1e-6, 3), "MB")
 
 
@@ -438,6 +441,12 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             kwargs["relative_paths"] = False
         if not isinstance(kwargs["relative_paths"], bool):
             raise TypeError("The 'relative_paths' keyword argument parameter must be a `bool` object.")
+        if kwargs["max_decompressed_bytes"] is None:
+            kwargs["max_decompressed_bytes"] = 200_000_000 # 200 MB
+        if not isinstance(kwargs["max_decompressed_bytes"], int):
+            raise TypeError("The 'max_decompressed_bytes' keyword argument parameter must be a `int` object.")
+        elif kwargs["max_decompressed_bytes"] <= 0:
+            raise ValueError("The 'max_decompressed_bytes' keyword argument parameter must be greater than 0 bytes.")
         if kwargs["database"] is None:
             kwargs["database"] = pyrosetta._rosetta_database_from_env()
         if not (isinstance(kwargs["database"], str) and os.path.isdir(kwargs["database"])):
@@ -474,11 +483,11 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
         return self.decode_binary(value.split(PyRosettaInitFileSerializer._prefix_binary)[-1])
 
     def format_decode_string(self, value, option_name):
-        obj = self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1])
+        obj = self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1], self.kwargs["max_decompressed_bytes"])
         return self.decode(obj, option_name)
 
     def format_decode_substring(self, value):
-        return self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1])
+        return self.decode_string(value.split(PyRosettaInitFileSerializer._prefix_string)[-1], self.kwargs["max_decompressed_bytes"])
 
     def decode(self, encoded_object, option_name):
         file_content = ""
@@ -639,6 +648,7 @@ class PyRosettaInitFileParser(object):
         output_dir=None,
         skip_corrections=None,
         relative_paths=None,
+        max_decompressed_bytes=None,
         database=None,
         set_logging_handler=None,
         notebook=None,
@@ -669,6 +679,10 @@ class PyRosettaInitFileParser(object):
             relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
                 (with respect to the current working directory) of the files written to the 'output_dir' keyword argument parameter.
                 Default: False
+            max_decompressed_bytes: An optional `int` object specifying the maximum permitted number of bytes per decompressed PyRosetta
+                input file (with a default of 200 MB). If a PyRosetta input file in the input '.init' file exceeds this buffer size
+                upon decompression, then a `BufferError` is intentionally raised as a precaution.
+                Default: 200_000_000
             database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
@@ -692,6 +706,7 @@ class PyRosettaInitFileParser(object):
             output_dir=output_dir,
             skip_corrections=skip_corrections,
             relative_paths=relative_paths,
+            max_decompressed_bytes=max_decompressed_bytes,
             database=database,
             set_logging_handler=set_logging_handler,
             notebook=notebook,
@@ -704,6 +719,7 @@ class PyRosettaInitFileParser(object):
         dry_run=True,
         output_dir=None,
         relative_paths=None,
+        max_decompressed_bytes=None,
         database=None,
         as_dict=False,
     ):
@@ -729,6 +745,10 @@ class PyRosettaInitFileParser(object):
             relative_paths: An optional `bool` object specifying whether or not to return the relative paths (with respect to
                 the current working directory) of the files written to the 'output_dir' keyword argument parameter.
                 Default: False
+            max_decompressed_bytes: An optional `int` object specifying the maximum permitted number of bytes per decompressed PyRosetta
+                input file (with a default of 200 MB). If a PyRosetta input file in the input '.init' file exceeds this buffer size
+                upon decompression, then a `BufferError` is intentionally raised as a precaution.
+                Default: 200_000_000
             database: An optional `str` object representing the path to the Rosetta database. By default, the Rosetta database
                 is found using `pyrosetta._rosetta_database_from_env()`, but if the search fails then the Rosetta database path
                 may be manually input here.
@@ -751,6 +771,7 @@ class PyRosettaInitFileParser(object):
             output_dir=output_dir,
             skip_corrections=False,
             relative_paths=relative_paths,
+            max_decompressed_bytes=max_decompressed_bytes,
             database=database,
             set_logging_handler=None,
             notebook=None,
