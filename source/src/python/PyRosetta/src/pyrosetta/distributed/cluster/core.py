@@ -220,7 +220,7 @@ Args:
     init_file: A `str` object specifying the output '.init' file path. If a `NoneType`
         object (or an empty `str` object ('')) is provided, or `dry_run=True`, then skip
         writing an output '.init' file upon PyRosettaCluster instantiation. If skipped,
-        it is recommended to run `pyrosetta.dump_init_file` before or after the simulation.
+        it is recommended to run `pyrosetta.dump_init_file()` before or after the simulation.
         Default: `output_path`/`project_name`_`simulation_name`_pyrosetta.init
     author: An optional `str` object specifying the author(s) of the simulation that is
         written to the full simulation records and the PyRosetta initialization '.init' file.
@@ -690,7 +690,7 @@ class PyRosettaCluster(IO[G], LoggingSupport[G], SchedulerManager[G], TaskBase[G
         ),
     )
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         _maybe_init_client()
         self._setup_logger()
         self._write_environment_file(self.environment_file)
