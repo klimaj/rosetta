@@ -142,7 +142,7 @@ class PyRosettaInitFileSerializer(object):
     def decode_string(self, bytestring):
         obj = self.decode_binary(bytestring)
         tag, raw = self.split_tag(obj)
-        decompressed = zlib.decompress(raw).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
+        decompressed = self.zlib_decompress(raw).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
         if tag == PyRosettaInitFileSerializer._tag_str:
             result = decompressed
         elif tag == PyRosettaInitFileSerializer._tag_obj:
@@ -151,6 +151,23 @@ class PyRosettaInitFileSerializer(object):
             raise ValueError(tag)
 
         return result
+
+    def zlib_decompress(self, data, max_size=200_000_000, chunk_size=(64 * 1024)):
+        buf = memoryview(data)
+        zobj = zlib.decompressobj()
+        arr = bytearray()
+        for i in range(0, len(buf), chunk_size):
+            arr += zobj.decompress(buf[i: i + chunk_size])
+            if len(arr) > max_size:
+                raise BufferError(self.get_zlib_decompress_err_msg(arr, max_size))
+        arr += zobj.flush()
+        if len(arr) > max_size:
+            raise BufferError(self.get_zlib_decompress_err_msg(arr, max_size))
+
+        return bytes(arr)
+
+    def get_zlib_decompress_err_msg(self, arr, max_size):
+        return "Decompressed data exceeds maximim size limit: {0} > {1}".format(len(arr), max_size)
 
 
 class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSerializer):
