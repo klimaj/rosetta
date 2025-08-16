@@ -662,8 +662,8 @@ class PyRosettaInitFileParser(object):
             output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
             skip_corrections: An optional `bool` object specifying whether or not to skip any ScoreFunction corrections specified
-                in the input 'init_file' argumenter parameter, which are set in-code upon PyRosetta initiailization. If a `NoneType`
-                object is provided, then the input ScoreFunction corrections are automatically used for PyRosetta initiailization
+                in the input 'init_file' argument parameter, which are set in-code upon PyRosetta initialization. If a `NoneType`
+                object is provided, then the input ScoreFunction corrections are automatically used for PyRosetta initialization
                 if the PyRosetta version from the '.init' file does not match the current PyRosetta version.
                 Default: None
             relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
