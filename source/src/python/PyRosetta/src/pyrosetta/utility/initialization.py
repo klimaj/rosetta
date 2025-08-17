@@ -50,7 +50,7 @@ class PyRosettaInitFileParserBase(object):
                 "Current:  {0}".format(current_pyrosetta_build),
             ]
         )
-        warnings.warn(_msg, UserWarning, stacklevel=2)
+        warnings.warn(_msg, UserWarning, stacklevel=4)
 
     @property
     def was_init_called(self):
