@@ -649,16 +649,15 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
                 self.kwargs["skip_corrections"] = True
         options = self.get_options()
         self.print_results()
-        pyrosetta_init_kwargs = dict(
-            options=options,
-            extra_options="",
-            set_logging_handler=self.kwargs["set_logging_handler"],
-            notebook=self.kwargs["notebook"],
-            silent=self.kwargs["silent"],
-        )
         self.pprint_options(options)
         if not self.kwargs["dry_run"]:
-            pyrosetta.init(**pyrosetta_init_kwargs)
+            pyrosetta.init(
+                options=options,
+                extra_options="",
+                set_logging_handler=self.kwargs["set_logging_handler"],
+                notebook=self.kwargs["notebook"],
+                silent=self.kwargs["silent"],
+            )
 
 
 class PyRosettaInitFileParser(object):
