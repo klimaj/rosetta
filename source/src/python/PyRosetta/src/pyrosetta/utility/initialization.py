@@ -438,7 +438,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             warnings.warn(
                 "The output directory already exists! Please remove the output directory before disabling dry run: {0}".format(output_dir),
                 UserWarning,
-                stacklevel=2,
+                stacklevel=4,
             )
         else:
             raise IsADirectoryError(
