@@ -121,15 +121,15 @@ class PyRosettaInitFileSerializer(object):
     def encode_bytestring(self, bytestring):
         return base64.b64encode(bytestring).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
 
-    def encode_string(self, string):
-        if isinstance(string, str):
+    def encode_string(self, obj):
+        if isinstance(obj, str):
             tag = PyRosettaInitFileSerializer._tag_str
-            raw = string
-        elif isinstance(string, (list, dict)):
+            raw = obj
+        elif isinstance(obj, (list, dict)):
             tag = PyRosettaInitFileSerializer._tag_obj
-            raw = self.dump_json(string)
+            raw = self.dump_json(obj)
         else:
-            raise TypeError(string)
+            raise TypeError(obj)
         compressed = zlib.compress(
             raw.encode(PyRosettaInitFileSerializer._encoding),
             PyRosettaInitFileSerializer._compression_level,
@@ -143,9 +143,9 @@ class PyRosettaInitFileSerializer(object):
     def decode_string(self, bytestring, max_decompressed_bytes):
         obj = self.decode_binary(bytestring)
         tag, raw = self.split_tag(obj)
-        decompressed = self.zlib_decompress(
-            raw, max_decompressed_bytes
-        ).decode(PyRosettaInitFileSerializer._encoding, errors="strict")
+        decompressed = self.zlib_decompress(raw, max_decompressed_bytes).decode(
+            PyRosettaInitFileSerializer._encoding, errors="strict"
+        )
         if tag == PyRosettaInitFileSerializer._tag_str:
             result = decompressed
         elif tag == PyRosettaInitFileSerializer._tag_obj:
