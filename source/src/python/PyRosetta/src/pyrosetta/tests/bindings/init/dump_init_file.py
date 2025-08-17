@@ -104,7 +104,7 @@ def main(tmp_dir):
     init_file = os.path.join(tmp_dir, "my.init")
     metadata = [
         "Contains IGU, GNP, CYX, CED, R1A, and T3P Rosetta residue topology files and the 3prime5prime_methyl_phosphate patch file",
-        "Version 1.0",
+        "Version 2.0",
     ]
     pyrosetta.dump_init_file(
         init_file,
