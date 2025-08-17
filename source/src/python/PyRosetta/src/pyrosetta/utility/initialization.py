@@ -78,8 +78,8 @@ class PyRosettaInitFileSerializer(object):
     _encoding = "utf-8"
     _prefix_string = "[PyRosettaInitTextFile]"
     _prefix_binary = "[PyRosettaInitBinaryFile]"
-    _tag_str = b"Txt"
-    _tag_obj = b"Obj"
+    _tag_str = b'Txt'
+    _tag_obj = b'Obj'
 
     def dump_json(self, obj):
         return json.dumps(
