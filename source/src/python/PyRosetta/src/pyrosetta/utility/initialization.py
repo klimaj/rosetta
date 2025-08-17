@@ -42,9 +42,9 @@ class PyRosettaInitFileParserBase(object):
     def pyrosetta_build_warning(self, original_pyrosetta_build, current_pyrosetta_build):
         _msg = os.linesep.join(
             [
-                "The PyRosetta version that generated the initialization file "
+                "The PyRosetta version that generated the '.init' file "
                 + "does not match the current PyRosetta version. Please inspect "
-                + "the input initialization files if you encounter any issues during "
+                + "the PyRosetta input files if you encounter any issues during "
                 + "or after PyRosetta initialization: {0}".format(self.kwargs["output_dir"]),
                 "Original: {0}".format(original_pyrosetta_build),
                 "Current:  {0}".format(current_pyrosetta_build),
@@ -59,14 +59,14 @@ class PyRosettaInitFileParserBase(object):
     def validate_init_was_called(self):
         if not self.was_init_called:
             raise RuntimeError(
-                "PyRosetta must be already initialized to dump an initialization file. "
+                "PyRosetta must be already initialized to dump a '.init' file. "
                 + "Please run `pyrosetta.init()` with custom options and try again."
             )
 
     def validate_init_was_not_called(self):
         if self.was_init_called:
             raise RuntimeError(
-                "PyRosetta must not be already initialized to initialize from a file. "
+                "PyRosetta must not be already initialized to initialize from a '.init' file. "
                 "Please ensure that `pyrosetta.init()` was not already called (e.g., "
                 "if using a Jupyter notebook, please restart the kernel) and try again."
             )
@@ -386,15 +386,15 @@ class PyRosettaInitFileWriter(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
 
     def print_cached_files(self, dry_run):
         if dry_run:
-            print(f"Dry run dump PyRosetta initialization '.init' file:")
+            print(f"Dry run dump PyRosetta '.init' file:")
         else:
-            print(f"Dumping PyRosetta initialization '.init' file to: {self.output_filename}")
+            print(f"Dumping PyRosetta '.init' file to: {self.output_filename}")
         if len(self.cached_files) > 0:
             print("Compressed {0} PyRosetta initialization input files:".format(len(self.cached_files)))
             for file in self.cached_files:
                 print(os.path.relpath(file, start=os.curdir))
         else:
-            print("No PyRosetta initialization input files to compress.")
+            print("No PyRosetta input files to compress.")
         if dry_run:
             print(f"Skipping dumping PyRosetta initialization '.init' file...")
 
@@ -488,7 +488,7 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
 
     @property
     def _malformed_init_file_error_msg(self):
-        return "Cannot read malformed initialization file: {0}".format(self.init_file)
+        return "Cannot read malformed PyRosetta '.init' file: {0}".format(self.init_file)
 
     def format_decode_binary(self, value):
         return self.decode_binary(value.split(PyRosettaInitFileSerializer._prefix_binary)[-1])
@@ -592,15 +592,15 @@ class PyRosettaInitFileReader(PyRosettaInitFileParserBase, PyRosettaInitFileSeri
             if self.kwargs["dry_run"]:
                 print("Dry run PyRosetta initialization from file: {0}".format(self.init_file))
                 if self.file_counter == 0:
-                    print("No PyRosetta initialization input files to decompress.")
+                    print("No PyRosetta input files to decompress.")
                 else:
-                    print("Decompressed {0} PyRosetta initialization input files.".format(self.file_counter))
+                    print("Decompressed {0} PyRosetta input files.".format(self.file_counter))
             else:
                 print("Initializing PyRosetta from file: {0}".format(self.init_file))
                 if self.file_counter == 0:
-                    print("No PyRosetta initialization input files to decompress.")
+                    print("No PyRosetta input files to decompress.")
                 else:
-                    print("Decompressed {0} PyRosetta initialization input files written to: {1}".format(
+                    print("Decompressed {0} PyRosetta input files written to: {1}".format(
                             self.file_counter, self.kwargs["output_dir"]
                         )
                     )
@@ -674,9 +674,9 @@ class PyRosettaInitFileParser(object):
         Initialize PyRosetta from a '.init' file.
 
         This method decompresses PyRosetta initialization input files from an input '.init' file into an output directory, and
-        then runs `pyrosetta.init` with the cached Rosetta command line options pointing to files written to the output directory.
+        then runs `pyrosetta.init` with the cached Rosetta command line options pointing to the files written to the output directory.
         Therefore, it may be helpful to enable the 'dry_run' keyword argument to first inspect the Rosetta command line options
-        before committing to writing all files to disk and running PyRosetta initialization.
+        before committing to writing all PyRosetta input files to disk and running PyRosetta initialization.
 
         Args:
             init_file: A required `str` object representing the input '.init' file.
@@ -685,12 +685,12 @@ class PyRosettaInitFileParser(object):
             dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files and perform PyRosetta
                 initialization. If `True`, then only print the PyRosetta initialization options that would be run if it were `False`.
                 Default: False
-            output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files.
+            output_dir: An optional `str` object representing the output directory into which to decompress PyRosetta input files.
                 Default: `./pyrosetta_init_files`
             skip_corrections: An optional `bool` object specifying whether or not to skip any ScoreFunction corrections specified
-                in the input 'init_file' argument parameter, which are set in-code upon PyRosetta initialization. If a `NoneType`
-                object is provided, then the input ScoreFunction corrections are automatically used for PyRosetta initialization
-                if the PyRosetta version from the '.init' file does not match the current PyRosetta version.
+                in the input '.init' file, which are set in-code upon PyRosetta initialization. If a `NoneType` object is provided,
+                then the input ScoreFunction corrections are automatically used for PyRosetta initialization only if the PyRosetta
+                version from the '.init' file does not match the current PyRosetta version.
                 Default: None
             relative_paths: An optional `bool` object specifying whether or not to initialize PyRosetta with the relative paths
                 (with respect to the current working directory) of the files written to the 'output_dir' keyword argument parameter.
@@ -744,19 +744,19 @@ class PyRosettaInitFileParser(object):
 
         This method returns the PyRosetta initialization options from an input '.init' file without running `pyrosetta.init`. The 
         'dry_run' keyword argument is enabled by default in order to inspect the Rosetta command line options before committing
-        to decompressing and writing all files to disk. If 'dry_run' is disabled, then also decompress the PyRosetta initialization
-        input files into an output directory given by the 'output_dir' keyword argument without running `pyrosetta.init`.
+        to decompressing and writing all PyRosetta input files to disk. If 'dry_run' is disabled, then also decompress the PyRosetta
+        input files into an output directory given by the 'output_dir' keyword argument parameter without running `pyrosetta.init`.
 
         Args:
             init_file: A required `str` object representing the input '.init' file.
 
         Keyword Args:
-            dry_run: An optional `bool` object specifying whether or not to write PyRosetta initialization input files to disk.
-                If `True`, then the PyRosetta initialization input files will not be written to disk so the returned options
-                can be inspected (or input manually into `pyrosetta.init` if options do not contain input files).
+            dry_run: An optional `bool` object specifying whether or not to write PyRosetta input files to disk. If `True`, then the
+                PyRosetta input files will not be written to disk so the returned options can be inspected (or input manually into 
+                `pyrosetta.init` if options do not contain input files).
                 Default: True
-            output_dir: An optional `str` object representing the output directory in which to decompress PyRosetta input files if
-                the 'dry_run' keyword argument is `False`.
+            output_dir: An optional `str` object representing the output directory into which to decompress PyRosetta input files if
+                the 'dry_run' keyword argument parameter is `False`.
                 Default: `./pyrosetta_init_files`
             relative_paths: An optional `bool` object specifying whether or not to return the relative paths (with respect to
                 the current working directory) of the files written to the 'output_dir' keyword argument parameter.
@@ -774,7 +774,7 @@ class PyRosettaInitFileParser(object):
                 Default: False
 
         Raises:
-            ValueError when the 'as_dict' keyword argument parameter is not a `bool` object.
+            `ValueError` when the 'as_dict' keyword argument parameter is not a `bool` object.
 
         Returns:
             A `str` or `dict` object representing the PyRosetta initialization options.
@@ -811,14 +811,14 @@ class PyRosettaInitFileParser(object):
         """
         Write a PyRosetta initialization '.init' file.
 
-        This method uses the `ProtocolSettingsMetric` SimpleMetric to get Rosetta command line options and compresses any input files
+        This method uses the `ProtocolSettingsMetric` SimpleMetric to get Rosetta command line options and compresses any PyRosetta input files
         (including files containing lists of files) into the output '.init' file. The Rosetta database directory is automatically excluded.
-        Only the relative paths of any input directories (from the current working directory) are saved in the Rosetta command
-        line options (e.g., '-in:path:bcl /path/to/current/directory/bcl_rosetta' is saved as '-in:path:bcl ./bcl_rosetta'). Therefore,
-        it may be helpful to add comments to the 'metadata' keyword argument parameter about specific PyRosetta initialization requirements.
-        PyRosetta initialization input files are automatically detected and compressed into the provided 'output_filename' argument parameter,
-        and so it can be useful to start with the `dry_run` keyword argument enabled to confirm that the PyRosetta initialization input files
-        are correct. Note that automatic detection of input files containing any spaces (e.g., ' ') in file paths or filenames is not supported.
+        Only the relative paths of any input directories (from the current working directory) are saved in the Rosetta command line options
+        (e.g., '-in:path:bcl /path/to/current/directory/bcl_rosetta' is saved as '-in:path:bcl ./bcl_rosetta'). Therefore, it may be
+        helpful to add comments to the 'metadata' keyword argument parameter about specific PyRosetta initialization requirements. PyRosetta
+        initialization input files are automatically detected and compressed into the provided 'output_filename' argument parameter,
+        and so it can be useful to start with the `dry_run` keyword argument enabled to confirm that the PyRosetta input files are correct.
+        Note that automatic detection of PyRosetta input files containing any spaces (e.g., ' ') in file paths or filenames is not supported.
 
         Args:
             output_filename: A required `str` object representing the output '.init' file.
@@ -855,8 +855,8 @@ class PyRosettaInitFileParser(object):
     @staticmethod
     def get_init_options(compressed=False, as_dict=False):
         """
-        Get the currently initialized PyRosetta initialization options. This method uses the `ProtocolSettingsMetric` SimpleMetric
-        to get the Rosetta command line options (including the Rosetta database).
+        Get the currently initialized Rosetta command line options using the `ProtocolSettingsMetric` SimpleMetric, including the
+        Rosetta database.
 
         Keyword Args:
             compressed: An optional `bool` object specifying whether or not to compress any input files (including files containing
@@ -869,8 +869,8 @@ class PyRosettaInitFileParser(object):
                 Default: False
 
         Raises:
-            ValueError when the 'compressed' or 'as_dict' keyword argument parameters are not `bool` objects.
-            NotImplementedError when `compressed=True` and `as_dict=False`.
+            `ValueError` when the 'compressed' or 'as_dict' keyword argument parameters are not `bool` objects.
+            `NotImplementedError` when `compressed=True` and `as_dict=False`.
 
         Returns:
             A `str` or `dict` object representing the PyRosetta initialization options.
@@ -893,9 +893,7 @@ class PyRosettaInitFileParser(object):
             if as_dict:
                 return writer.get_encoded_options_dict()
             else:
-                raise NotImplementedError(
-                    "Formatting compressed PyRosetta initialization options into a `str` object is not supported."
-                )
+                raise NotImplementedError("Formatting compressed PyRosetta initialization options into a `str` object is not supported.")
         else:
             if as_dict:
                 return writer.get_options_dict()
